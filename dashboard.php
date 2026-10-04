@@ -15,6 +15,18 @@ if (!isset($_SESSION['login'])) {
     <meta charset="UTF-8">
     <title>Dashboard</title>
       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .nav-link {
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+    </style>
+
 </head>
 
 <body>
@@ -62,6 +74,7 @@ if (!isset($_SESSION['login'])) {
                         Laporan
                     </a>
                 </li>
+
                 <li class="nav-item mb-2">
                     <a href="about.php" class="nav-link text-white">
                         About 
@@ -85,6 +98,7 @@ if (!isset($_SESSION['login'])) {
                         Dashboard
                     </a>
                 </li>
+
                 <li class="nav-item mb-2">
                     <a href="admin/menu3/" class="nav-link text-white">
                         Kelas
@@ -96,6 +110,7 @@ if (!isset($_SESSION['login'])) {
                         Laporan
                     </a>
                 </li>
+
                 <li class="nav-item">
                     <a href="logout.php" class="nav-link text-danger">
                         Logout
