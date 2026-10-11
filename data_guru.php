@@ -38,16 +38,20 @@ if (isset($_POST['tambah'])) {
 }
 
 
-// HAPUS DATA
+// NONAKTIFKAN DATA guru
 if (isset($_GET['hapus'])) {
 
     $id = $_GET['hapus'];
 
-    mysqli_query($koneksi, "DELETE FROM t_guru WHERE id = '$id'");
+    mysqli_query(
+        $koneksi,
+        "UPDATE t_guru SET status_aktif = 0 WHERE id = '$id'"
+    );
 
     header("Location: data_guru.php");
     exit;
 }
+
 
 
 // EDIT DATA

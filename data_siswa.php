@@ -35,17 +35,19 @@ if (isset($_POST['tambah'])) {
 }
 
 
-// HAPUS DATA
+// NONAKTIFKAN DATA SISWA
 if (isset($_GET['hapus'])) {
 
     $id = $_GET['hapus'];
 
-    mysqli_query($koneksi, "DELETE FROM t_siswa WHERE id = '$id'");
+    mysqli_query(
+        $koneksi,
+        "UPDATE t_siswa SET status_aktif = 0 WHERE id = '$id'"
+    );
 
     header("Location: data_siswa.php");
     exit;
 }
-
 
 // EDIT DATA
 if (isset($_POST['edit'])) {
@@ -433,8 +435,14 @@ $data_siswa = mysqli_query(
                     </td>
 
                     <td>
-                        <?php echo $siswa['status_aktif']; ?>
-                    </td>
+    <?php
+    if ($siswa['status_aktif'] == 1) {
+        echo "Aktif";
+    } else {
+        echo "Tidak Aktif";
+    }
+    ?>
+</td>
 
                     <td>
 
