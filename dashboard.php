@@ -32,6 +32,10 @@ $halaman = 'dashboard';
             background-color: #0d6efd !important;
             color: white !important;
         }
+
+        .sidebar {
+            position: fixed;
+        }
     </style>
 </head>
 <body>
@@ -95,15 +99,19 @@ $halaman = 'dashboard';
                     <div class="card shadow-sm">
 
                         <div class="card-body">
+                            
 
                             <h5 class="card-title">
                                 Data Siswa
                             </h5>
 
+                            
                             <h2>
                                 120
                             </h2>
-
+                             <button type="submit" name="login" class="btn btn-primary w-10 rounded-3 login-button">
+                        LIHAT
+                    </button> 
                         </div>
 
                     </div>
@@ -126,7 +134,9 @@ $halaman = 'dashboard';
                             <h2>
                                 25
                             </h2>
-
+                             <button type="submit" name="login" class="btn btn-primary w-10 rounded-3 login-button">
+                        LIHAT
+                    </button> 
                         </div>
 
                     </div>
@@ -149,7 +159,9 @@ $halaman = 'dashboard';
                             <h2>
                                 12
                             </h2>
-
+                             <button type="submit" name="login" class="btn btn-primary w-10 rounded-3 login-button">
+                        LIHAT
+                    </button> 
                         </div>
 
                     </div>

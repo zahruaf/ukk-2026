@@ -40,6 +40,22 @@
             </a>
         </li>
 
+        
+<li class="nav-item mb-2">
+    <a href="tahun_ajaran.php"
+       class="nav-link <?php echo ($halaman == 'tahun_ajaran') ? 'active' : 'text-white'; ?>">
+        Tahun Ajaran
+    </a>
+</li>
+
+<li class="nav-item mb-2">
+    <a href="kategori_pelanggaran.php"
+       class="nav-link <?php echo ($halaman == 'kategori_pelanggaran') ? 'active' : 'text-white'; ?>">
+        Kategori Pelanggaran
+    </a>
+</li>
+
+
 
         <li class="nav-item mb-2">
             <a href="laporan.php"

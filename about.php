@@ -13,6 +13,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
+        
+
+        .nav-link {
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+
 
         body {
             background-color: #7200b8;
@@ -50,7 +61,7 @@
                     >
 
                     <h2 class="mt-3 mb-1">
-                        Nama Kamu
+                        Muhammad zahru a.f
                     </h2>
 
                     <p class="text-muted mb-0">

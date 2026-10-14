@@ -122,7 +122,11 @@ $data_siswa = mysqli_query(
         .nav-link:hover {
             background-color: #0d6efd !important;
             color: white !important;
+
+            
         }
+        
+        
 
     </style>
 
