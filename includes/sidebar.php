@@ -1,4 +1,5 @@
-<div class="col-md-3 col-lg-2 bg-dark min-vh-100 p-3">
+<div class="col-md-3 col-lg-2 bg-dark min-vh-100 p-3 position-fixed top-0 start-0 overflow-auto"
+     style="height: 100vh;">
 
     <h4 class="text-white mb-4">
         My Website
@@ -47,6 +48,14 @@
         Tahun Ajaran
     </a>
 </li>
+
+
+      <li class="nav-item mb-2">
+             <a href="jenis_pelanggaran.php"
+             class="nav-link <?php echo ($halaman == 'jenis_pelanggaran') ? 'active' : 'text-white'; ?>">
+                 Jenis Pelanggaran
+            </a>
+            </li>
 
 <li class="nav-item mb-2">
     <a href="kategori_pelanggaran.php"
@@ -106,7 +115,7 @@
             </a>
         </li>
 
-
+        
         <li class="nav-item mb-2">
             <a href="laporan.php"
                class="nav-link <?php echo ($halaman == 'laporan') ? 'active' : 'text-white'; ?>">

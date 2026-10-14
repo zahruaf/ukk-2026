@@ -131,8 +131,7 @@ $query = mysqli_query(
 
         <?php include 'includes/sidebar.php'; ?>
 
-        <main class="col-md-9 col-lg-10 p-4">
-
+<main class="col-md-9 col-lg-10 p-4 ms-md-auto">
             <h2>Kategori Pelanggaran</h2>
             <p>Kelola kategori pelanggaran siswa.</p>
 

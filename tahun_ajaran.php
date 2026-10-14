@@ -157,8 +157,7 @@ $hasil = mysqli_query(
 
         <?php include 'includes/sidebar.php'; ?>
 
-        <main class="col-md-9 col-lg-10 p-4">
-
+<main class="col-md-9 col-lg-10 p-4 ms-md-auto">
             <h2>Data Tahun Ajaran</h2>
             <p>Kelola data tahun ajaran sekolah.</p>
 

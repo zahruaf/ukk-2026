@@ -146,7 +146,7 @@ $data_siswa = mysqli_query(
 
         <!-- KONTEN -->
 
-        <main class="col-md-9 col-lg-10 p-4">
+        <main class="col-md-9 col-lg-10 p-4 ms-md-auto">
 
             <h2>Data Siswa</h2>
 
