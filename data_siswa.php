@@ -157,7 +157,7 @@ $data_siswa = mysqli_query(
 
                 <h3>Edit Data Siswa</h3>
 
-                <form method="POST">
+                <form class="form-control" method="POST">
 
                     <input
                         type="hidden"

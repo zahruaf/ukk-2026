@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 23, 2026 at 07:27 AM
+-- Generation Time: Sep 30, 2026 at 02:53 AM
 -- Server version: 10.4.25-MariaDB
 -- PHP Version: 8.0.23
 
@@ -638,8 +638,8 @@ CREATE TABLE `t_users` (
 --
 
 INSERT INTO `t_users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `role`, `created_at`, `updated_at`) VALUES
-(1, 'User 1', 'user1@sekolah.sch.id', '2026-01-01 01:00:00', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCz7lq9wz2aYf0vYfWm2', '', 'admin', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
-(2, 'User 2', 'user2@sekolah.sch.id', '2026-01-01 01:00:00', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCz7lq9wz2aYf0vYfWm2', '', 'petugas', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
+(1, 'User 1', 'admin@gmail.com', '2026-01-01 01:00:00', '$2y$12$I8/Qt4xFed56g7JwZthe8.KMxf1upIkuIJs0m9hojyV9wdltDYplu', '', 'admin', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
+(2, 'User 2', 'guru@gmail.com', '2026-01-01 01:00:00', '$2y$12$I8/Qt4xFed56g7JwZthe8.KMxf1upIkuIJs0m9hojyV9wdltDYplu', '', 'petugas', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
 (3, 'User 3', 'user3@sekolah.sch.id', '2026-01-01 01:00:00', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCz7lq9wz2aYf0vYfWm2', '', 'petugas', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
 (4, 'User 4', 'user4@sekolah.sch.id', '2026-01-01 01:00:00', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCz7lq9wz2aYf0vYfWm2', '', 'petugas', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
 (5, 'User 5', 'user5@sekolah.sch.id', '2026-01-01 01:00:00', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llCz7lq9wz2aYf0vYfWm2', '', 'petugas', '2026-01-01 01:00:00', '2026-01-01 01:00:00'),
