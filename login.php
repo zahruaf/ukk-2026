@@ -63,7 +63,7 @@ if (isset($_POST['login'])) {
     <style>
 
         body {
-            background-color: #2a2a2b;
+            background-color: #0f9f91;
         }
 
         .login-card {
@@ -71,14 +71,14 @@ if (isset($_POST['login'])) {
          }
 
          .login-button {
-        background-color: #2a2a2b;
+        background-color: #0f766e;
         
         border-color: #f1f1f1;
         }
 
          .login-button:hover {
-    background-color: #727272;
-    border-color: #727272;
+    background-color: #080505;
+    border-color: #ffffff;
         }
     </style>
 

@@ -103,16 +103,203 @@ $data_kelas = mysqli_query(
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-
-        .nav-link {
-            transition: all 0.3s ease;
+        :root {
+            --navy: #101c35;
+            --teal: #14b8a6;
+            --background: #f4f7fb;
+            --text: #243047;
+            --muted: #778399;
         }
 
-        .nav-link:hover {
-            background-color: #0d6efd !important;
-            color: white !important;
+        body {
+            background: var(--background);
+            color: var(--text);
+            font-family: Arial, sans-serif;
         }
 
+        main {
+            min-height: 100vh;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            color: var(--muted);
+            margin-bottom: 0;
+        }
+
+        .content-card {
+            background: #fff;
+            border: 1px solid #e8edf4;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 5px 18px rgba(16, 28, 53, 0.04);
+        }
+
+        .section-title {
+            color: var(--navy);
+            font-size: 19px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #344158;
+            margin-bottom: 8px;
+        }
+
+        .form-control,
+        .form-select {
+            border: 1px solid #dce3ed;
+            border-radius: 9px;
+            padding: 10px 12px;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+        }
+
+        .btn-teal {
+            background: var(--teal);
+            color: #fff;
+            border: 1px solid var(--teal);
+            border-radius: 9px;
+            padding: 10px 18px;
+            font-weight: 600;
+        }
+
+        .btn-teal:hover {
+            background: #0f9f91;
+            border-color: #0f9f91;
+            color: #fff;
+        }
+
+        .btn-light-custom {
+            background: #fff;
+            border: 1px solid #dce3ed;
+            color: #46536a;
+            border-radius: 9px;
+            padding: 10px 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-light-custom:hover {
+            background: #f4f7fb;
+            color: var(--navy);
+        }
+
+        .table {
+            margin-bottom: 0;
+            vertical-align: middle;
+        }
+
+        .table thead th {
+            background: #f5f8fc;
+            color: #536078;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 15px 12px;
+            border-bottom: 1px solid #e5eaf1;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #edf0f5;
+            color: #344158;
+        }
+
+        .table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table tbody tr:hover {
+            background: #f9fbfd;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--navy);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-active {
+            color: #087f70;
+            background: #d9f8f1;
+        }
+
+        .status-inactive {
+            color: #9a4b16;
+            background: #fff0dc;
+        }
+
+        .action-link {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 7px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .action-edit {
+            color: #0f766e;
+            background: #dff8f3;
+        }
+
+        .action-edit:hover {
+            background: #c8f1e9;
+            color: #115e59;
+        }
+
+        .action-disable {
+            color: #b45309;
+            background: #fff0dc;
+        }
+
+        .action-disable:hover {
+            background: #ffe4bd;
+            color: #92400e;
+        }
+
+        .table-count {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 767.98px) {
+            main {
+                padding: 20px !important;
+            }
+
+            .content-card {
+                padding: 16px;
+            }
+
+            .page-title {
+                font-size: 24px;
+            }
+        }
     </style>
 
 </head>

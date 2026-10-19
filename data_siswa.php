@@ -1,5 +1,5 @@
-<?php
 
+<?php
 session_start();
 
 if (!isset($_SESSION['login'])) {
@@ -11,10 +11,8 @@ include 'config/koneksi.php';
 
 $halaman = 'siswa';
 
-
 // TAMBAH DATA
 if (isset($_POST['tambah'])) {
-
     $nis = $_POST['nis'];
     $nisn = $_POST['nisn'];
     $nama = $_POST['nama'];
@@ -34,10 +32,8 @@ if (isset($_POST['tambah'])) {
     exit;
 }
 
-
 // NONAKTIFKAN DATA SISWA
 if (isset($_GET['hapus'])) {
-
     $id = $_GET['hapus'];
 
     mysqli_query(
@@ -51,7 +47,6 @@ if (isset($_GET['hapus'])) {
 
 // EDIT DATA
 if (isset($_POST['edit'])) {
-
     $id = $_POST['id'];
     $nis = $_POST['nis'];
     $nisn = $_POST['nisn'];
@@ -77,12 +72,10 @@ if (isset($_POST['edit'])) {
     exit;
 }
 
-
 // DATA UNTUK EDIT
 $data_edit = null;
 
 if (isset($_GET['edit'])) {
-
     $id = $_GET['edit'];
 
     $hasil_edit = mysqli_query(
@@ -93,387 +86,536 @@ if (isset($_GET['edit'])) {
     $data_edit = mysqli_fetch_assoc($hasil_edit);
 }
 
-
 // TAMPIL DATA
 $data_siswa = mysqli_query(
     $koneksi,
     "SELECT * FROM t_siswa ORDER BY id ASC"
 );
-
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <title>Data Siswa</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Siswa - SIPES</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
-
-        .nav-link {
-            transition: all 0.3s ease;
+        :root {
+            --navy: #101c35;
+            --teal: #14b8a6;
+            --background: #f4f7fb;
+            --text: #243047;
+            --muted: #778399;
         }
 
-        .nav-link:hover {
-            background-color: #0d6efd !important;
-            color: white !important;
-
-            
+        body {
+            background: var(--background);
+            color: var(--text);
+            font-family: Arial, sans-serif;
         }
-        
-        
 
+        main {
+            min-height: 100vh;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            color: var(--muted);
+            margin-bottom: 0;
+        }
+
+        .content-card {
+            background: #fff;
+            border: 1px solid #e8edf4;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 5px 18px rgba(16, 28, 53, 0.04);
+        }
+
+        .section-title {
+            color: var(--navy);
+            font-size: 19px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #344158;
+            margin-bottom: 8px;
+        }
+
+        .form-control,
+        .form-select {
+            border: 1px solid #dce3ed;
+            border-radius: 9px;
+            padding: 10px 12px;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+        }
+
+        .btn-teal {
+            background: var(--teal);
+            color: #fff;
+            border: 1px solid var(--teal);
+            border-radius: 9px;
+            padding: 10px 18px;
+            font-weight: 600;
+        }
+
+        .btn-teal:hover {
+            background: #0f9f91;
+            border-color: #0f9f91;
+            color: #fff;
+        }
+
+        .btn-light-custom {
+            background: #fff;
+            border: 1px solid #dce3ed;
+            color: #46536a;
+            border-radius: 9px;
+            padding: 10px 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-light-custom:hover {
+            background: #f4f7fb;
+            color: var(--navy);
+        }
+
+        .table {
+            margin-bottom: 0;
+            vertical-align: middle;
+        }
+
+        .table thead th {
+            background: #f5f8fc;
+            color: #536078;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 15px 12px;
+            border-bottom: 1px solid #e5eaf1;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #edf0f5;
+            color: #344158;
+        }
+
+        .table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table tbody tr:hover {
+            background: #f9fbfd;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--navy);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-active {
+            color: #087f70;
+            background: #d9f8f1;
+        }
+
+        .status-inactive {
+            color: #9a4b16;
+            background: #fff0dc;
+        }
+
+        .action-link {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 7px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .action-edit {
+            color: #0f766e;
+            background: #dff8f3;
+        }
+
+        .action-edit:hover {
+            background: #c8f1e9;
+            color: #115e59;
+        }
+
+        .action-disable {
+            color: #b45309;
+            background: #fff0dc;
+        }
+
+        .action-disable:hover {
+            background: #ffe4bd;
+            color: #92400e;
+        }
+
+        .table-count {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 767.98px) {
+            main {
+                padding: 20px !important;
+            }
+
+            .content-card {
+                padding: 16px;
+            }
+
+            .page-title {
+                font-size: 24px;
+            }
+        }
     </style>
-
 </head>
 
 <body>
-
 <div class="container-fluid">
-
     <div class="row">
-
-
-        <!-- SIDEBAR -->
 
         <?php include 'includes/sidebar.php'; ?>
 
-
-        <!-- KONTEN -->
-
         <main class="col-md-9 col-lg-10 p-4 ms-md-auto">
 
-            <h2>Data Siswa</h2>
-
-            <hr>
-
+            <div class="mb-4">
+                <h1 class="page-title">Data Siswa</h1>
+                <p class="page-subtitle">
+                    Kelola informasi dan status siswa yang terdaftar.
+                </p>
+            </div>
 
             <?php if ($data_edit) { ?>
 
-                <h3>Edit Data Siswa</h3>
+                <div class="content-card">
+                    <h2 class="section-title">Edit Data Siswa</h2>
 
-                <form class="form-control" method="POST">
-
-                    <input
-                        type="hidden"
-                        name="id"
-                        value="<?php echo $data_edit['id']; ?>"
-                    >
-
-                    <p>
-                        NIS:
-                        <br>
+                    <form method="POST">
                         <input
-                            type="text"
-                            name="nis"
-                            value="<?php echo $data_edit['nis']; ?>"
-                            required
-                        >
-                    </p>
-
-                    <p>
-                        NISN:
-                        <br>
-                        <input
-                            type="text"
-                            name="nisn"
-                            value="<?php echo $data_edit['nisn']; ?>"
-                            required
-                        >
-                    </p>
-
-                    <p>
-                        Nama:
-                        <br>
-                        <input
-                            type="text"
-                            name="nama"
-                            value="<?php echo $data_edit['nama']; ?>"
-                            required
-                        >
-                    </p>
-
-                    <p>
-                        Jenis Kelamin:
-                        <br>
-
-                        <select name="jenis_kelamin" required>
-
-                            <option value="L"
-                                <?php if ($data_edit['jenis_kelamin'] == 'L') echo 'selected'; ?>>
-                                Laki-laki
-                            </option>
-
-                            <option value="P"
-                                <?php if ($data_edit['jenis_kelamin'] == 'P') echo 'selected'; ?>>
-                                Perempuan
-                            </option>
-
-                        </select>
-
-                    </p>
-
-                    <p>
-                        Tanggal Lahir:
-                        <br>
-
-                        <input
-                            type="date"
-                            name="tanggal_lahir"
-                            value="<?php echo $data_edit['tanggal_lahir']; ?>"
-                            required
+                            type="hidden"
+                            name="id"
+                            value="<?php echo htmlspecialchars($data_edit['id']); ?>"
                         >
 
-                    </p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">NIS</label>
+                                <input
+                                    type="text"
+                                    name="nis"
+                                    class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nis']); ?>"
+                                    required
+                                >
+                            </div>
 
-                    <p>
-                        Alamat:
-                        <br>
+                            <div class="col-md-6">
+                                <label class="form-label">NISN</label>
+                                <input
+                                    type="text"
+                                    name="nisn"
+                                    class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nisn']); ?>"
+                                    required
+                                >
+                            </div>
 
-                        <textarea
-                            name="alamat"
-                            required
-                        ><?php echo $data_edit['alamat']; ?></textarea>
+                            <div class="col-md-6">
+                                <label class="form-label">Nama Siswa</label>
+                                <input
+                                    type="text"
+                                    name="nama"
+                                    class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nama']); ?>"
+                                    required
+                                >
+                            </div>
 
-                    </p>
+                            <div class="col-md-6">
+                                <label class="form-label">Jenis Kelamin</label>
+                                <select name="jenis_kelamin" class="form-select" required>
+                                    <option value="L" <?php if ($data_edit['jenis_kelamin'] == 'L') echo 'selected'; ?>>
+                                        Laki-laki
+                                    </option>
+                                    <option value="P" <?php if ($data_edit['jenis_kelamin'] == 'P') echo 'selected'; ?>>
+                                        Perempuan
+                                    </option>
+                                </select>
+                            </div>
 
-                    <p>
-                        Status Aktif:
-                        <br>
+                            <div class="col-md-6">
+                                <label class="form-label">Tanggal Lahir</label>
+                                <input
+                                    type="date"
+                                    name="tanggal_lahir"
+                                    class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['tanggal_lahir']); ?>"
+                                    required
+                                >
+                            </div>
 
-                        <select name="status_aktif" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Status Aktif</label>
+                                <select name="status_aktif" class="form-select" required>
+                                    <option value="1" <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>
+                                        Aktif
+                                    </option>
+                                    <option value="0" <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>
+                                        Tidak Aktif
+                                    </option>
+                                </select>
+                            </div>
 
-                            <option value="1"
-                                <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>
-                                Aktif
-                            </option>
+                            <div class="col-12">
+                                <label class="form-label">Alamat</label>
+                                <textarea
+                                    name="alamat"
+                                    class="form-control"
+                                    rows="3"
+                                    required
+                                ><?php echo htmlspecialchars($data_edit['alamat']); ?></textarea>
+                            </div>
 
-                            <option value="0"
-                                <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>
-                                Tidak Aktif
-                            </option>
+                            <div class="col-12 d-flex gap-2 flex-wrap">
+                                <button type="submit" name="edit" class="btn btn-teal">
+                                    Simpan Perubahan
+                                </button>
 
-                        </select>
-
-                    </p>
-
-                    <button type="submit" name="edit">
-                        Update
-                    </button>
-
-                    <a href="data_siswa.php">
-                        Batal
-                    </a>
-
-                </form>
+                                <a href="data_siswa.php" class="btn-light-custom">
+                                    Batal
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
 
             <?php } else { ?>
 
-                <h3>Tambah Data Siswa</h3>
+                <div class="content-card">
+                    <h2 class="section-title">Tambah Data Siswa</h2>
 
-                <form method="POST">
+                    <form method="POST">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">NIS</label>
+                                <input
+                                    type="text"
+                                    name="nis"
+                                    class="form-control"
+                                    placeholder="Masukkan NIS"
+                                    required
+                                >
+                            </div>
 
-                    <p>
-                        NIS:
-                        <br>
-                        <input
-                            type="text"
-                            name="nis"
-                            required
-                        >
-                    </p>
+                            <div class="col-md-6">
+                                <label class="form-label">NISN</label>
+                                <input
+                                    type="text"
+                                    name="nisn"
+                                    class="form-control"
+                                    placeholder="Masukkan NISN"
+                                    required
+                                >
+                            </div>
 
-                    <p>
-                        NISN:
-                        <br>
-                        <input
-                            type="text"
-                            name="nisn"
-                            required
-                        >
-                    </p>
+                            <div class="col-md-6">
+                                <label class="form-label">Nama Siswa</label>
+                                <input
+                                    type="text"
+                                    name="nama"
+                                    class="form-control"
+                                    placeholder="Masukkan nama siswa"
+                                    required
+                                >
+                            </div>
 
-                    <p>
-                        Nama:
-                        <br>
-                        <input
-                            type="text"
-                            name="nama"
-                            required
-                        >
-                    </p>
+                            <div class="col-md-6">
+                                <label class="form-label">Jenis Kelamin</label>
+                                <select name="jenis_kelamin" class="form-select" required>
+                                    <option value="">Pilih jenis kelamin</option>
+                                    <option value="L">Laki-laki</option>
+                                    <option value="P">Perempuan</option>
+                                </select>
+                            </div>
 
-                    <p>
-                        Jenis Kelamin:
-                        <br>
+                            <div class="col-md-6">
+                                <label class="form-label">Tanggal Lahir</label>
+                                <input
+                                    type="date"
+                                    name="tanggal_lahir"
+                                    class="form-control"
+                                    required
+                                >
+                            </div>
 
-                        <select name="jenis_kelamin" required>
+                            <div class="col-md-6">
+                                <label class="form-label">Status Aktif</label>
+                                <select name="status_aktif" class="form-select" required>
+                                    <option value="1">Aktif</option>
+                                    <option value="0">Tidak Aktif</option>
+                                </select>
+                            </div>
 
-                            <option value="">
-                                Pilih
-                            </option>
+                            <div class="col-12">
+                                <label class="form-label">Alamat</label>
+                                <textarea
+                                    name="alamat"
+                                    class="form-control"
+                                    rows="3"
+                                    placeholder="Masukkan alamat siswa"
+                                    required
+                                ></textarea>
+                            </div>
 
-                            <option value="L">
-                                Laki-laki
-                            </option>
-
-                            <option value="P">
-                                Perempuan
-                            </option>
-
-                        </select>
-
-                    </p>
-
-                    <p>
-                        Tanggal Lahir:
-                        <br>
-
-                        <input
-                            type="date"
-                            name="tanggal_lahir"
-                            required
-                        >
-
-                    </p>
-
-                    <p>
-                        Alamat:
-                        <br>
-
-                        <textarea
-                            name="alamat"
-                            required
-                        ></textarea>
-
-                    </p>
-
-                    <p>
-                        Status Aktif:
-                        <br>
-
-                        <select name="status_aktif" required>
-
-                            <option value="1">
-                                Aktif
-                            </option>
-
-                            <option value="0">
-                                Tidak Aktif
-                            </option>
-
-                        </select>
-
-                    </p>
-
-                    <button type="submit" name="tambah">
-                        Simpan
-                    </button>
-
-                </form>
+                            <div class="col-12">
+                                <button type="submit" name="tambah" class="btn btn-teal">
+                                    Tambah Siswa
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
 
             <?php } ?>
 
+            <div class="content-card">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h2 class="section-title mb-1">Daftar Siswa</h2>
+                        <p class="table-count mb-0">
+                            Data siswa yang tersimpan dalam sistem.
+                        </p>
+                    </div>
+                </div>
 
-            <hr>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>NIS</th>
+                                <th>NISN</th>
+                                <th>Nama</th>
+                                <th>Jenis Kelamin</th>
+                                <th>Tanggal Lahir</th>
+                                <th>Alamat</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
 
-            <h3>Daftar Siswa</h3>
+                        <tbody>
+                            <?php
+                            $no = 1;
 
-            <table border="1" cellpadding="5">
+                            while ($siswa = mysqli_fetch_assoc($data_siswa)) {
+                            ?>
+                                <tr>
+                                    <td><?php echo $no++; ?></td>
 
-                <tr>
+                                    <td>
+                                        <?php echo htmlspecialchars($siswa['nis']); ?>
+                                    </td>
 
-                    <th>No</th>
-                    <th>NIS</th>
-                    <th>NISN</th>
-                    <th>Nama</th>
-                    <th>Jenis Kelamin</th>
-                    <th>Tanggal Lahir</th>
-                    <th>Alamat</th>
-                    <th>Status</th>
-                    <th>Aksi</th>
+                                    <td>
+                                        <?php echo htmlspecialchars($siswa['nisn']); ?>
+                                    </td>
 
-                </tr>
+                                    <td>
+                                        <span class="student-name">
+                                            <?php echo htmlspecialchars($siswa['nama']); ?>
+                                        </span>
+                                    </td>
 
-                <?php
+                                    <td>
+                                        <?php
+                                        echo $siswa['jenis_kelamin'] == 'L'
+                                            ? 'Laki-laki'
+                                            : 'Perempuan';
+                                        ?>
+                                    </td>
 
-                $no = 1;
+                                    <td>
+                                        <?php echo htmlspecialchars($siswa['tanggal_lahir']); ?>
+                                    </td>
 
-                while ($siswa = mysqli_fetch_assoc($data_siswa)) {
+                                    <td>
+                                        <?php echo htmlspecialchars($siswa['alamat']); ?>
+                                    </td>
 
-                ?>
+                                    <td>
+                                        <?php if ($siswa['status_aktif'] == 1) { ?>
+                                            <span class="status-badge status-active">
+                                                Aktif
+                                            </span>
+                                        <?php } else { ?>
+                                            <span class="status-badge status-inactive">
+                                                Tidak Aktif
+                                            </span>
+                                        <?php } ?>
+                                    </td>
 
-                <tr>
+                                    <td>
+                                        <div class="d-flex gap-2">
+                                            <a
+                                                href="data_siswa.php?edit=<?php echo $siswa['id']; ?>"
+                                                class="action-link action-edit"
+                                            >
+                                                Edit
+                                            </a>
 
-                    <td>
-                        <?php echo $no++; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['nis']; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['nisn']; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['nama']; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['jenis_kelamin']; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['tanggal_lahir']; ?>
-                    </td>
-
-                    <td>
-                        <?php echo $siswa['alamat']; ?>
-                    </td>
-
-                    <td>
-    <?php
-    if ($siswa['status_aktif'] == 1) {
-        echo "Aktif";
-    } else {
-        echo "Tidak Aktif";
-    }
-    ?>
-</td>
-
-                    <td>
-
-                        <a href="data_siswa.php?edit=<?php echo $siswa['id']; ?>">
-                            Edit
-                        </a>
-
-                        |
-
-                        <a href="data_siswa.php?hapus=<?php echo $siswa['id']; ?>">
-                            Hapus
-                        </a>
-
-                    </td>
-
-                </tr>
-
-                <?php } ?>
-
-            </table>
+                                            <?php if ($siswa['status_aktif'] == 1) { ?>
+                                                <a
+                                                    href="data_siswa.php?hapus=<?php echo $siswa['id']; ?>"
+                                                    class="action-link action-disable"
+                                                >
+                                                    Nonaktifkan
+                                                </a>
+                                            <?php } ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
         </main>
-
     </div>
-
 </div>
-
 </body>
-
 </html>

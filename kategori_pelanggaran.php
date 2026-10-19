@@ -236,11 +236,11 @@ $query = mysqli_query(
                                     <td><?= $no++ ?></td>
 
                                     <td>
-                                        <?= htmlspecialchars($data['nama']) ?>
+                                        <?= htmlspecialchars($data['nama_siswa']) ?>
                                     </td>
 
                                     <td>
-                                        <?= htmlspecialchars($data['nama_siswa'] ?? '-') ?>
+                                        <?= htmlspecialchars($data['nama'] ?? '-') ?>
                                     </td>
 
                                     <td>
