@@ -289,7 +289,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Data Siswa</div>
 
-                            <h2 class="stat-number">120</h2>
+                            <h2 class="stat-number"></h2>
 
                             <a href="data_siswa.php" class="btn-teal">
                                 LIHAT DATA
@@ -305,7 +305,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Data Guru</div>
 
-                            <h2 class="stat-number">25</h2>
+                            <h2 class="stat-number"></h2>
 
                             <?php if ($role_pengguna == 'admin') { ?>
                                 <a href="data_guru.php" class="btn-teal">
@@ -327,7 +327,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Kelas</div>
 
-                            <h2 class="stat-number">12</h2>
+                            <h2 class="stat-number"></h2>
 
                             <a href="kelas.php" class="btn-teal">
                                 LIHAT DATA
