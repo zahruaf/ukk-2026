@@ -196,11 +196,17 @@ $data_guru = mysqli_query(
             padding: 10px 16px;
             text-decoration: none;
             display: inline-block;
+            white-space: nowrap;
         }
 
         .btn-light-custom:hover {
             background: #f4f7fb;
             color: var(--navy);
+        }
+
+        .search-area {
+            width: 100%;
+            max-width: 390px;
         }
 
         .table {
@@ -292,6 +298,12 @@ $data_guru = mysqli_query(
             font-size: 13px;
         }
 
+        .empty-state {
+            text-align: center;
+            padding: 24px !important;
+            color: var(--muted) !important;
+        }
+
         @media (max-width: 767.98px) {
             main {
                 padding: 20px !important;
@@ -303,6 +315,10 @@ $data_guru = mysqli_query(
 
             .page-title {
                 font-size: 24px;
+            }
+
+            .search-area {
+                max-width: 100%;
             }
         }
     </style>
@@ -489,15 +505,42 @@ $data_guru = mysqli_query(
             <?php } ?>
 
             <div class="content-card">
-                <div class="mb-3">
-                    <h2 class="section-title mb-1">Daftar Guru</h2>
-                    <p class="table-count mb-0">
-                        Data guru yang tersimpan dalam sistem.
-                    </p>
+                <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+                    <div>
+                        <h2 class="section-title mb-1">Daftar Guru</h2>
+                        <p class="table-count mb-0">
+                            Data guru yang tersimpan dalam sistem.
+                        </p>
+                    </div>
+
+                    <div class="search-area">
+                        <label for="cariGuru" class="form-label">
+                            Cari Data Guru
+                        </label>
+
+                        <div class="d-flex gap-2">
+                            <input
+                                type="search"
+                                id="cariGuru"
+                                class="form-control"
+                                placeholder="Cari NIP, nama, email, atau status..."
+                            >
+
+                            <button
+                                type="button"
+                                id="resetCariGuru"
+                                class="btn-light-custom"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
+                <p id="hasilPencarianGuru" class="table-count mb-3"></p>
+
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table" id="tabelGuru">
                         <thead>
                             <tr>
                                 <th>No</th>
@@ -570,6 +613,12 @@ $data_guru = mysqli_query(
                                     </td>
                                 </tr>
                             <?php } ?>
+
+                            <tr id="pesanGuruKosong" style="display: none;">
+                                <td colspan="7" class="empty-state">
+                                    Data guru tidak ditemukan.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -578,5 +627,65 @@ $data_guru = mysqli_query(
         </main>
     </div>
 </div>
+
+<script>
+const inputCariGuru = document.getElementById('cariGuru');
+const tombolResetGuru = document.getElementById('resetCariGuru');
+const tabelGuru = document.getElementById('tabelGuru');
+const pesanGuruKosong = document.getElementById('pesanGuruKosong');
+const hasilPencarianGuru = document.getElementById('hasilPencarianGuru');
+
+function cariDataGuru() {
+    const kataKunci = inputCariGuru.value.toLowerCase().trim();
+
+    const semuaBaris = Array.from(
+        tabelGuru.querySelectorAll('tbody tr')
+    ).filter(baris => baris.id !== 'pesanGuruKosong');
+
+    let jumlahTampil = 0;
+
+    semuaBaris.forEach(baris => {
+        // Cari hanya pada kolom NIP, nama, email, status, dan User ID.
+        // Kolom nomor serta tombol aksi tidak ikut dicari.
+        const kolomCari = [
+            baris.cells[1],
+            baris.cells[2],
+            baris.cells[3],
+            baris.cells[4],
+            baris.cells[5]
+        ];
+
+        const teksBaris = kolomCari
+            .map(kolom => kolom.textContent)
+            .join(' ')
+            .toLowerCase();
+
+        const cocok = teksBaris.includes(kataKunci);
+
+        baris.style.display = cocok ? '' : 'none';
+
+        if (cocok) {
+            jumlahTampil++;
+        }
+    });
+
+    pesanGuruKosong.style.display = jumlahTampil === 0 ? '' : 'none';
+
+    hasilPencarianGuru.textContent = kataKunci === ''
+        ? 'Total data: ' + semuaBaris.length + ' guru'
+        : jumlahTampil + ' guru ditemukan';
+}
+
+inputCariGuru.addEventListener('input', cariDataGuru);
+
+tombolResetGuru.addEventListener('click', function () {
+    inputCariGuru.value = '';
+    cariDataGuru();
+    inputCariGuru.focus();
+});
+
+cariDataGuru();
+</script>
+
 </body>
 </html>

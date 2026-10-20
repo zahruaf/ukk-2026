@@ -287,6 +287,17 @@ $data_siswa = mysqli_query(
             font-size: 13px;
         }
 
+        .search-area {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--muted);
+            padding: 28px !important;
+        }
+
         @media (max-width: 767.98px) {
             main {
                 padding: 20px !important;
@@ -298,6 +309,10 @@ $data_siswa = mysqli_query(
 
             .page-title {
                 font-size: 24px;
+            }
+
+            .search-area {
+                max-width: 100%;
             }
         }
     </style>
@@ -333,90 +348,52 @@ $data_siswa = mysqli_query(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">NIS</label>
-                                <input
-                                    type="text"
-                                    name="nis"
-                                    class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['nis']); ?>"
-                                    required
-                                >
+                                <input type="text" name="nis" class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nis']); ?>" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">NISN</label>
-                                <input
-                                    type="text"
-                                    name="nisn"
-                                    class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['nisn']); ?>"
-                                    required
-                                >
+                                <input type="text" name="nisn" class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nisn']); ?>" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Nama Siswa</label>
-                                <input
-                                    type="text"
-                                    name="nama"
-                                    class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['nama']); ?>"
-                                    required
-                                >
+                                <input type="text" name="nama" class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['nama']); ?>" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Jenis Kelamin</label>
                                 <select name="jenis_kelamin" class="form-select" required>
-                                    <option value="L" <?php if ($data_edit['jenis_kelamin'] == 'L') echo 'selected'; ?>>
-                                        Laki-laki
-                                    </option>
-                                    <option value="P" <?php if ($data_edit['jenis_kelamin'] == 'P') echo 'selected'; ?>>
-                                        Perempuan
-                                    </option>
+                                    <option value="L" <?php if ($data_edit['jenis_kelamin'] == 'L') echo 'selected'; ?>>Laki-laki</option>
+                                    <option value="P" <?php if ($data_edit['jenis_kelamin'] == 'P') echo 'selected'; ?>>Perempuan</option>
                                 </select>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Tanggal Lahir</label>
-                                <input
-                                    type="date"
-                                    name="tanggal_lahir"
-                                    class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['tanggal_lahir']); ?>"
-                                    required
-                                >
+                                <input type="date" name="tanggal_lahir" class="form-control"
+                                    value="<?php echo htmlspecialchars($data_edit['tanggal_lahir']); ?>" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Status Aktif</label>
                                 <select name="status_aktif" class="form-select" required>
-                                    <option value="1" <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>
-                                        Aktif
-                                    </option>
-                                    <option value="0" <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>
-                                        Tidak Aktif
-                                    </option>
+                                    <option value="1" <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>Aktif</option>
+                                    <option value="0" <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>Tidak Aktif</option>
                                 </select>
                             </div>
 
                             <div class="col-12">
                                 <label class="form-label">Alamat</label>
-                                <textarea
-                                    name="alamat"
-                                    class="form-control"
-                                    rows="3"
-                                    required
-                                ><?php echo htmlspecialchars($data_edit['alamat']); ?></textarea>
+                                <textarea name="alamat" class="form-control" rows="3" required><?php echo htmlspecialchars($data_edit['alamat']); ?></textarea>
                             </div>
 
                             <div class="col-12 d-flex gap-2 flex-wrap">
-                                <button type="submit" name="edit" class="btn btn-teal">
-                                    Simpan Perubahan
-                                </button>
-
-                                <a href="data_siswa.php" class="btn-light-custom">
-                                    Batal
-                                </a>
+                                <button type="submit" name="edit" class="btn btn-teal">Simpan Perubahan</button>
+                                <a href="data_siswa.php" class="btn-light-custom">Batal</a>
                             </div>
                         </div>
                     </form>
@@ -431,35 +408,17 @@ $data_siswa = mysqli_query(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">NIS</label>
-                                <input
-                                    type="text"
-                                    name="nis"
-                                    class="form-control"
-                                    placeholder="Masukkan NIS"
-                                    required
-                                >
+                                <input type="text" name="nis" class="form-control" placeholder="Masukkan NIS" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">NISN</label>
-                                <input
-                                    type="text"
-                                    name="nisn"
-                                    class="form-control"
-                                    placeholder="Masukkan NISN"
-                                    required
-                                >
+                                <input type="text" name="nisn" class="form-control" placeholder="Masukkan NISN" required>
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Nama Siswa</label>
-                                <input
-                                    type="text"
-                                    name="nama"
-                                    class="form-control"
-                                    placeholder="Masukkan nama siswa"
-                                    required
-                                >
+                                <input type="text" name="nama" class="form-control" placeholder="Masukkan nama siswa" required>
                             </div>
 
                             <div class="col-md-6">
@@ -473,12 +432,7 @@ $data_siswa = mysqli_query(
 
                             <div class="col-md-6">
                                 <label class="form-label">Tanggal Lahir</label>
-                                <input
-                                    type="date"
-                                    name="tanggal_lahir"
-                                    class="form-control"
-                                    required
-                                >
+                                <input type="date" name="tanggal_lahir" class="form-control" required>
                             </div>
 
                             <div class="col-md-6">
@@ -491,13 +445,7 @@ $data_siswa = mysqli_query(
 
                             <div class="col-12">
                                 <label class="form-label">Alamat</label>
-                                <textarea
-                                    name="alamat"
-                                    class="form-control"
-                                    rows="3"
-                                    placeholder="Masukkan alamat siswa"
-                                    required
-                                ></textarea>
+                                <textarea name="alamat" class="form-control" rows="3" placeholder="Masukkan alamat siswa" required></textarea>
                             </div>
 
                             <div class="col-12">
@@ -512,17 +460,34 @@ $data_siswa = mysqli_query(
             <?php } ?>
 
             <div class="content-card">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
                     <div>
                         <h2 class="section-title mb-1">Daftar Siswa</h2>
                         <p class="table-count mb-0">
                             Data siswa yang tersimpan dalam sistem.
                         </p>
                     </div>
+
+                    <div class="search-area">
+                        <label for="cariSiswa" class="form-label">Cari Data Siswa</label>
+                        <div class="d-flex gap-2">
+                            <input
+                                type="search"
+                                id="cariSiswa"
+                                class="form-control"
+                                placeholder="Cari NIS, NISN, nama, alamat..."
+                            >
+                            <button type="button" id="resetCariSiswa" class="btn-light-custom">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
+                <p id="hasilPencarianSiswa" class="table-count mb-3"></p>
+
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table" id="tabelSiswa">
                         <thead>
                             <tr>
                                 <th>No</th>
@@ -545,21 +510,13 @@ $data_siswa = mysqli_query(
                             ?>
                                 <tr>
                                     <td><?php echo $no++; ?></td>
-
-                                    <td>
-                                        <?php echo htmlspecialchars($siswa['nis']); ?>
-                                    </td>
-
-                                    <td>
-                                        <?php echo htmlspecialchars($siswa['nisn']); ?>
-                                    </td>
-
+                                    <td><?php echo htmlspecialchars($siswa['nis']); ?></td>
+                                    <td><?php echo htmlspecialchars($siswa['nisn']); ?></td>
                                     <td>
                                         <span class="student-name">
                                             <?php echo htmlspecialchars($siswa['nama']); ?>
                                         </span>
                                     </td>
-
                                     <td>
                                         <?php
                                         echo $siswa['jenis_kelamin'] == 'L'
@@ -567,48 +524,38 @@ $data_siswa = mysqli_query(
                                             : 'Perempuan';
                                         ?>
                                     </td>
-
-                                    <td>
-                                        <?php echo htmlspecialchars($siswa['tanggal_lahir']); ?>
-                                    </td>
-
-                                    <td>
-                                        <?php echo htmlspecialchars($siswa['alamat']); ?>
-                                    </td>
-
+                                    <td><?php echo htmlspecialchars($siswa['tanggal_lahir']); ?></td>
+                                    <td><?php echo htmlspecialchars($siswa['alamat']); ?></td>
                                     <td>
                                         <?php if ($siswa['status_aktif'] == 1) { ?>
-                                            <span class="status-badge status-active">
-                                                Aktif
-                                            </span>
+                                            <span class="status-badge status-active">Aktif</span>
                                         <?php } else { ?>
-                                            <span class="status-badge status-inactive">
-                                                Tidak Aktif
-                                            </span>
+                                            <span class="status-badge status-inactive">Tidak Aktif</span>
                                         <?php } ?>
                                     </td>
-
                                     <td>
                                         <div class="d-flex gap-2">
                                             <a
-                                                href="data_siswa.php?edit=<?php echo $siswa['id']; ?>"
+                                                href="data_siswa.php?edit=<?php echo (int) $siswa['id']; ?>"
                                                 class="action-link action-edit"
-                                            >
-                                                Edit
-                                            </a>
+                                            >Edit</a>
 
                                             <?php if ($siswa['status_aktif'] == 1) { ?>
                                                 <a
-                                                    href="data_siswa.php?hapus=<?php echo $siswa['id']; ?>"
+                                                    href="data_siswa.php?hapus=<?php echo (int) $siswa['id']; ?>"
                                                     class="action-link action-disable"
-                                                >
-                                                    Nonaktifkan
-                                                </a>
+                                                >Nonaktifkan</a>
                                             <?php } ?>
                                         </div>
                                     </td>
                                 </tr>
                             <?php } ?>
+
+                            <tr id="pesanSiswaKosong" style="display: none;">
+                                <td colspan="9" class="empty-state">
+                                    Data siswa tidak ditemukan.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -617,5 +564,51 @@ $data_siswa = mysqli_query(
         </main>
     </div>
 </div>
+
+<script>
+const inputCari = document.getElementById('cariSiswa');
+const tombolReset = document.getElementById('resetCariSiswa');
+const tabelSiswa = document.getElementById('tabelSiswa');
+const pesanKosong = document.getElementById('pesanSiswaKosong');
+const hasilPencarian = document.getElementById('hasilPencarianSiswa');
+
+function cariDataSiswa() {
+    const kataKunci = inputCari.value.toLowerCase().trim();
+
+    const semuaBaris = Array.from(
+        tabelSiswa.querySelectorAll('tbody tr')
+    ).filter(baris => baris.id !== 'pesanSiswaKosong');
+
+    let jumlahTampil = 0;
+
+    semuaBaris.forEach(baris => {
+        const teksBaris = baris.textContent.toLowerCase();
+        const cocok = teksBaris.includes(kataKunci);
+
+        baris.style.display = cocok ? '' : 'none';
+
+        if (cocok) {
+            jumlahTampil++;
+        }
+    });
+
+    pesanKosong.style.display = jumlahTampil === 0 ? '' : 'none';
+
+    hasilPencarian.textContent = kataKunci === ''
+        ? 'Total data: ' + semuaBaris.length + ' siswa'
+        : jumlahTampil + ' siswa ditemukan';
+}
+
+inputCari.addEventListener('input', cariDataSiswa);
+
+tombolReset.addEventListener('click', function () {
+    inputCari.value = '';
+    cariDataSiswa();
+    inputCari.focus();
+});
+
+cariDataSiswa();
+</script>
+
 </body>
 </html>

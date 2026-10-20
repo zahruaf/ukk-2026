@@ -145,6 +145,191 @@ $query = mysqli_query(
 <!DOCTYPE html>
 <html lang="id">
 <head>
+    
+<style>
+    :root {
+        --navy: #101c35;
+        --navy-light: #20314d;
+        --teal: #14b8a6;
+        --page-bg: #f4f7fb;
+        --text-main: #243047;
+        --text-muted: #7b879b;
+        --border-color: #e7ecf3;
+    }
+
+    body {
+        background: var(--page-bg);
+        color: var(--text-main);
+        font-family: Arial, sans-serif;
+    }
+
+    main {
+        min-height: 100vh;
+        min-width: 0;
+    }
+
+    .page-title {
+        color: var(--navy);
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .content-card {
+        background: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 5px 20px rgba(16, 28, 53, 0.04);
+    }
+
+    .section-title {
+        color: var(--navy);
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .section-description {
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .form-label {
+        color: var(--text-main);
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .form-control {
+        border: 1px solid #dce3ed;
+        border-radius: 9px;
+        padding: 11px 12px;
+        font-size: 14px;
+    }
+
+    .form-control:focus {
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    }
+
+    .btn-primary {
+        background: var(--navy);
+        border-color: var(--navy);
+        border-radius: 9px;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .btn-primary:hover {
+        background: var(--navy-light);
+        border-color: var(--navy-light);
+    }
+
+    .btn-secondary {
+        border-radius: 9px;
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    .table {
+        margin-bottom: 0;
+        vertical-align: middle;
+    }
+
+    .table thead th {
+        background: #f7f9fc;
+        color: #68758b;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 15px 16px;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+
+    .table tbody td {
+        padding: 15px 16px;
+        font-size: 14px;
+        border-color: #edf1f6;
+        color: #364258;
+    }
+
+    .table tbody tr:hover td {
+        background: #fafcff;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .status-active {
+        background: #e5f8f3;
+        color: #13866f;
+    }
+
+    .status-inactive {
+        background: #f0f2f5;
+        color: #697386;
+    }
+
+    .btn-warning {
+        background: #eaf2ff;
+        color: #2458a6;
+        border-color: #d8e6ff;
+    }
+
+    .btn-warning:hover {
+        background: #dce9ff;
+        color: #194583;
+        border-color: #d8e6ff;
+    }
+
+    .btn-danger {
+        background: #fff0f0;
+        color: #c33d4b;
+        border-color: #ffdddd;
+    }
+
+    .btn-danger:hover {
+        background: #ffe0e0;
+        color: #a52634;
+        border-color: #ffdddd;
+    }
+
+    .btn-sm {
+        border-radius: 7px;
+        padding: 6px 10px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    @media (max-width: 767.98px) {
+        main {
+            padding: 20px 14px !important;
+        }
+
+        .content-card {
+            padding: 17px;
+        }
+
+        .page-title {
+            font-size: 25px;
+        }
+    }
+</style>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jenis Pelanggaran</title>
@@ -161,9 +346,12 @@ $query = mysqli_query(
 
         <main class="col-md-9 col-lg-10 p-4 ms-md-auto">
 
-            <h2>Jenis Pelanggaran</h2>
-            <p>Kelola jenis pelanggaran dan poin pelanggaran siswa.</p>
-
+            <div class="mb-4">
+    <h2 class="page-title mb-2">Data Tahun Ajaran</h2>
+    <p class="page-subtitle mb-0">
+        Kelola data tahun ajaran sekolah.
+    </p>
+</div>
             <?php if ($pesan != '') { ?>
                 <div class="alert alert-danger">
                     <?= htmlspecialchars($pesan) ?>
