@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -18,17 +17,75 @@ $halaman = 'tahun_ajaran';
 $pesan = '';
 $edit = null;
 
+// VALIDASI TAHUN AJARAN DAN TANGGAL
+function validasiTahunAjaran($nama, $tanggal_mulai, $tanggal_selesai)
+{
+    if ($nama == '' || $tanggal_mulai == '' || $tanggal_selesai == '') {
+        return 'Semua kolom wajib diisi.';
+    }
+
+    // Format tahun ajaran harus YYYY/YYYY
+    if (!preg_match('/^(\d{4})\/(\d{4})$/', $nama, $tahun)) {
+        return 'Format tahun ajaran harus seperti 2026/2027.';
+    }
+
+    $tahun_mulai = (int) $tahun[1];
+    $tahun_selesai = (int) $tahun[2];
+
+    // Tahun kedua harus tepat satu tahun setelah tahun pertama
+    if ($tahun_selesai != $tahun_mulai + 1) {
+        return 'Tahun ajaran harus berurutan, misalnya 2026/2027.';
+    }
+
+    // Validasi format tanggal YYYY-MM-DD
+    $tanggal_mulai_valid = DateTime::createFromFormat('!Y-m-d', $tanggal_mulai);
+    $tanggal_selesai_valid = DateTime::createFromFormat('!Y-m-d', $tanggal_selesai);
+
+    if (
+        !$tanggal_mulai_valid ||
+        $tanggal_mulai_valid->format('Y-m-d') !== $tanggal_mulai
+    ) {
+        return 'Tanggal mulai tidak valid.';
+    }
+
+    if (
+        !$tanggal_selesai_valid ||
+        $tanggal_selesai_valid->format('Y-m-d') !== $tanggal_selesai
+    ) {
+        return 'Tanggal selesai tidak valid.';
+    }
+
+    // Tanggal mulai harus berada pada tahun pertama
+    if ((int) $tanggal_mulai_valid->format('Y') != $tahun_mulai) {
+        return 'Tahun pada tanggal mulai harus sesuai dengan tahun pertama tahun ajaran.';
+    }
+
+    // Tanggal selesai harus berada pada tahun kedua
+    if ((int) $tanggal_selesai_valid->format('Y') != $tahun_selesai) {
+        return 'Tahun pada tanggal selesai harus sesuai dengan tahun kedua tahun ajaran.';
+    }
+
+    // Tanggal selesai tidak boleh sebelum tanggal mulai
+    if ($tanggal_selesai < $tanggal_mulai) {
+        return 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
+    }
+
+    return '';
+}
+
 // Tambah Tahun Ajaran
 if (isset($_POST['tambah'])) {
     $nama = trim($_POST['nama']);
     $tanggal_mulai = $_POST['tanggal_mulai'];
     $tanggal_selesai = $_POST['tanggal_selesai'];
 
-    if ($nama == '' || $tanggal_mulai == '' || $tanggal_selesai == '') {
-        $pesan = 'Semua kolom wajib diisi.';
-    } elseif ($tanggal_selesai < $tanggal_mulai) {
-        $pesan = 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
-    } else {
+    $pesan = validasiTahunAjaran(
+        $nama,
+        $tanggal_mulai,
+        $tanggal_selesai
+    );
+
+    if ($pesan == '') {
         $stmt = mysqli_prepare(
             $koneksi,
             "INSERT INTO t_tahun_ajaran
@@ -63,11 +120,13 @@ if (isset($_POST['edit'])) {
     $tanggal_mulai = $_POST['tanggal_mulai'];
     $tanggal_selesai = $_POST['tanggal_selesai'];
 
-    if ($nama == '' || $tanggal_mulai == '' || $tanggal_selesai == '') {
-        $pesan = 'Semua kolom wajib diisi.';
-    } elseif ($tanggal_selesai < $tanggal_mulai) {
-        $pesan = 'Tanggal selesai tidak boleh sebelum tanggal mulai.';
-    } else {
+    $pesan = validasiTahunAjaran(
+        $nama,
+        $tanggal_mulai,
+        $tanggal_selesai
+    );
+
+    if ($pesan == '') {
         $stmt = mysqli_prepare(
             $koneksi,
             "UPDATE t_tahun_ajaran
@@ -136,11 +195,27 @@ if (isset($_GET['edit'])) {
     mysqli_stmt_close($stmt);
 }
 
-// Ambil Semua Data Tahun Ajaran
-$query = mysqli_query(
-    $koneksi,
-    "SELECT * FROM t_tahun_ajaran ORDER BY id ASC"
-);
+// Fitur Pencarian & Ambil Data Tahun Ajaran
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+if ($search != '') {
+    $stmt_search = mysqli_prepare(
+        $koneksi,
+        "SELECT * FROM t_tahun_ajaran WHERE nama LIKE ? OR tanggal_mulai LIKE ? OR tanggal_selesai LIKE ? ORDER BY id ASC"
+    );
+    $keyword = "%{$search}%";
+    mysqli_stmt_bind_param($stmt_search, "sss", $keyword, $keyword, $keyword);
+    mysqli_stmt_execute($stmt_search);
+    $query = mysqli_stmt_get_result($stmt_search);
+} else {
+    $query = mysqli_query(
+        $koneksi,
+        "SELECT * FROM t_tahun_ajaran ORDER BY id ASC"
+    );
+}
+
+// Hitung total data untuk informasi
+$total_query = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM t_tahun_ajaran");
+$total_data = mysqli_fetch_assoc($total_query)['total'] ?? 0;
 ?>
 
 <!DOCTYPE html>
@@ -429,7 +504,9 @@ $query = mysqli_query(
                                 class="form-control"
                                 id="nama"
                                 name="nama"
-                                maxlength="20"
+                                maxlength="9"
+                                pattern="[0-9]{4}/[0-9]{4}"
+                                title="Gunakan format YYYY/YYYY, contoh 2026/2027"
                                 placeholder="Contoh: 2026/2027"
                                 value="<?= htmlspecialchars($edit['nama'] ?? ''); ?>"
                                 required
@@ -493,8 +570,29 @@ $query = mysqli_query(
         </section>
 
         <section class="content-card">
-            <div class="card-heading">
-                <h5>Daftar Tahun Ajaran</h5>
+            <div class="card-heading d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <h5>Daftar Tahun Ajaran</h5>
+                    <small class="text-muted">Total data: <?= $total_data; ?> tahun ajaran</small>
+                </div>
+                <div>
+                    <form method="GET" action="tahun_ajaran.php" class="d-flex align-items-center gap-2">
+                        <div class="d-flex flex-column">
+                            <label class="form-label mb-1" style="font-size: 11px;">Cari Data Tahun Ajaran</label>
+                            <input 
+                                type="text" 
+                                name="search" 
+                                value="<?= htmlspecialchars($search); ?>" 
+                                placeholder="Cari tahun ajaran atau tanggal..." 
+                                class="form-control form-control-sm"
+                                style="width: 240px;"
+                            >
+                        </div>
+                        <div class="d-flex align-items-end" style="margin-top: 19px;">
+                            <a href="tahun_ajaran.php" class="btn btn-outline-secondary btn-sm" style="padding: 6px 12px; border-radius: 9px;">Reset</a>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -576,7 +674,7 @@ $query = mysqli_query(
                         <?php else: ?>
                             <tr>
                                 <td colspan="6" class="empty-state">
-                                    Belum ada data tahun ajaran.
+                                    Belum ada data tahun ajaran yang ditemukan.
                                 </td>
                             </tr>
                         <?php endif; ?>

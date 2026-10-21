@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -16,32 +15,93 @@ include 'config/koneksi.php';
 
 $halaman = 'guru';
 
-// TAMBAH DATA
+// TAMBAH DATA GURU
 if (isset($_POST['tambah'])) {
     $nip = $_POST['nip'];
     $nama = $_POST['nama'];
     $email = $_POST['email'];
     $status_aktif = $_POST['status_aktif'];
-    $user_id = $_POST['user_id'];
+    $pilihan_user = $_POST['user_id'];
+    $password = $_POST['password'] ?? '';
+    $pesan_error = '';
 
-    $sql = "INSERT INTO t_guru
-            (nip, nama, email, status_aktif, user_id)
-            VALUES
-            ('$nip', '$nama', '$email', '$status_aktif', '$user_id')";
+    if ($pilihan_user === 'baru') {
+        if ($password === '') {
+            $pesan_error = 'Password wajib diisi untuk membuat akun login baru.';
+        } else {
+            $cek_email = mysqli_prepare($koneksi, "SELECT id FROM t_users WHERE email = ?");
+            mysqli_stmt_bind_param($cek_email, "s", $email);
+            mysqli_stmt_execute($cek_email);
+            $hasil_cek_email = mysqli_stmt_get_result($cek_email);
 
-    mysqli_query($koneksi, $sql);
+            if (mysqli_num_rows($hasil_cek_email) > 0) {
+                $pesan_error = 'Email tersebut sudah digunakan. Gunakan email yang berbeda.';
+            } else {
+                mysqli_begin_transaction($koneksi);
+
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $role = 'petugas';
+                $stmt_user = mysqli_prepare(
+                    $koneksi,
+                    "INSERT INTO t_users (name, email, password, role) VALUES (?, ?, ?, ?)"
+                );
+                mysqli_stmt_bind_param($stmt_user, "ssss", $nama, $email, $password_hash, $role);
+
+                if (mysqli_stmt_execute($stmt_user)) {
+                    $user_id = mysqli_insert_id($koneksi);
+                    $sql = "INSERT INTO t_guru
+                            (nip, nama, email, status_aktif, user_id)
+                            VALUES
+                            ('$nip', '$nama', '$email', '$status_aktif', '$user_id')";
+
+                    if (mysqli_query($koneksi, $sql)) {
+                        mysqli_commit($koneksi);
+                        header("Location: data_guru.php");
+                        exit;
+                    } else {
+                        mysqli_rollback($koneksi);
+                        $pesan_error = 'Data guru gagal disimpan. Akun login baru tidak jadi dibuat.';
+                    }
+                } else {
+                    mysqli_rollback($koneksi);
+                    $pesan_error = 'Akun login gagal dibuat. Periksa kembali data akun.';
+                }
+            }
+        }
+    } else {
+        $user_id = $pilihan_user;
+        $sql = "INSERT INTO t_guru
+                (nip, nama, email, status_aktif, user_id)
+                VALUES
+                ('$nip', '$nama', '$email', '$status_aktif', '$user_id')";
+
+        mysqli_query($koneksi, $sql);
+
+        header("Location: data_guru.php");
+        exit;
+    }
+}
+
+// NONAKTIFKAN DATA GURU (SOFT DELETE)
+if (isset($_GET['nonaktifkan'])) {
+    $id = (int)$_GET['nonaktifkan'];
+
+    mysqli_query(
+        $koneksi,
+        "UPDATE t_guru SET status_aktif = 0 WHERE id = '$id'"
+    );
 
     header("Location: data_guru.php");
     exit;
 }
 
-// NONAKTIFKAN DATA GURU
-if (isset($_GET['hapus'])) {
-    $id = $_GET['hapus'];
+// HAPUS PERMANEN DATA GURU (HARD DELETE)
+if (isset($_GET['hapus_permanen'])) {
+    $id = (int)$_GET['hapus_permanen'];
 
     mysqli_query(
         $koneksi,
-        "UPDATE t_guru SET status_aktif = 0 WHERE id = '$id'"
+        "DELETE FROM t_guru WHERE id = '$id'"
     );
 
     header("Location: data_guru.php");
@@ -293,6 +353,16 @@ $data_guru = mysqli_query(
             color: #92400e;
         }
 
+        .action-delete {
+            color: #c33d4b;
+            background: #fff0f0;
+        }
+
+        .action-delete:hover {
+            background: #ffe0e0;
+            color: #a52634;
+        }
+
         .table-count {
             color: var(--muted);
             font-size: 13px;
@@ -337,6 +407,12 @@ $data_guru = mysqli_query(
                 <p class="page-subtitle">
                     Kelola informasi guru dan akun pengguna yang terhubung.
                 </p>
+
+                <?php if (!empty($pesan_error)) { ?>
+                    <div class="alert alert-danger mt-3" role="alert">
+                        <?php echo htmlspecialchars($pesan_error); ?>
+                    </div>
+                <?php } ?>
             </div>
 
             <?php if ($data_edit) { ?>
@@ -410,6 +486,7 @@ $data_guru = mysqli_query(
                                         </option>
                                     <?php } ?>
                                 </select>
+
                                 <small class="text-secondary">
                                     Pilih akun pengguna yang terhubung dengan data guru ini.
                                 </small>
@@ -479,7 +556,8 @@ $data_guru = mysqli_query(
                             <div class="col-12">
                                 <label class="form-label">Akun Pengguna</label>
                                 <select name="user_id" class="form-select" required>
-                                    <option value="">Pilih akun pengguna</option>
+                                    <option value="baru" selected>Buat akun login baru</option>
+                                    <option value="">Pilih akun pengguna yang sudah ada</option>
 
                                     <?php while ($user = mysqli_fetch_assoc($data_user)) { ?>
                                         <option value="<?php echo htmlspecialchars($user['id']); ?>">
@@ -488,8 +566,25 @@ $data_guru = mysqli_query(
                                         </option>
                                     <?php } ?>
                                 </select>
+
                                 <small class="text-secondary">
-                                    Pilih akun pengguna yang akan dihubungkan dengan data guru.
+                                    Pilih "Buat akun login baru" agar email dan password bisa dipakai guru untuk login. Akun lama tetap bisa dipilih.
+                                </small>
+                            </div>
+
+                            <div class="col-md-6" id="kolomPasswordGuru">
+                                <label class="form-label">Password Login Guru</label>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    id="passwordGuru"
+                                    class="form-control"
+                                    placeholder="Buat password untuk login"
+                                    autocomplete="new-password"
+                                >
+
+                                <small class="text-secondary">
+                                    Password hanya digunakan saat membuat akun login baru.
                                 </small>
                             </div>
 
@@ -603,10 +698,19 @@ $data_guru = mysqli_query(
 
                                             <?php if ($guru['status_aktif'] == 1) { ?>
                                                 <a
-                                                    href="data_guru.php?hapus=<?php echo $guru['id']; ?>"
+                                                    href="data_guru.php?nonaktifkan=<?php echo $guru['id']; ?>"
                                                     class="action-link action-disable"
+                                                    onclick="return confirm('Menonaktifkan guru ini?');"
                                                 >
                                                     Nonaktifkan
+                                                </a>
+                                            <?php } else { ?>
+                                                <a
+                                                    href="data_guru.php?hapus_permanen=<?php echo $guru['id']; ?>"
+                                                    class="action-link action-delete"
+                                                    onclick="return confirm('Yakin mau hapus guru ini secara permanen dari database?');"
+                                                >
+                                                    Hapus
                                                 </a>
                                             <?php } ?>
                                         </div>
@@ -645,8 +749,6 @@ function cariDataGuru() {
     let jumlahTampil = 0;
 
     semuaBaris.forEach(baris => {
-        // Cari hanya pada kolom NIP, nama, email, status, dan User ID.
-        // Kolom nomor serta tombol aksi tidak ikut dicari.
         const kolomCari = [
             baris.cells[1],
             baris.cells[2],
@@ -685,6 +787,23 @@ tombolResetGuru.addEventListener('click', function () {
 });
 
 cariDataGuru();
+
+const pilihanAkunGuru = document.querySelector('select[name="user_id"]');
+const kolomPasswordGuru = document.getElementById('kolomPasswordGuru');
+const passwordGuru = document.getElementById('passwordGuru');
+
+function aturKolomPasswordGuru() {
+    if (!pilihanAkunGuru || !kolomPasswordGuru || !passwordGuru) return;
+
+    const buatAkunBaru = pilihanAkunGuru.value === 'baru';
+    kolomPasswordGuru.style.display = buatAkunBaru ? '' : 'none';
+    passwordGuru.required = buatAkunBaru;
+}
+
+if (pilihanAkunGuru) {
+    pilihanAkunGuru.addEventListener('change', aturKolomPasswordGuru);
+    aturKolomPasswordGuru();
+}
 </script>
 
 </body>

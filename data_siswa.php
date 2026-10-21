@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -10,6 +9,23 @@ if (!isset($_SESSION['login'])) {
 include 'config/koneksi.php';
 
 $halaman = 'siswa';
+$pesan = '';
+$edit_gagal = false;
+$data_edit = null;
+
+// VALIDASI NIS DAN NISN
+function validasiNomorSiswa($nis, $nisn)
+{
+    if (!preg_match('/^[0-9]{8}$/', $nis)) {
+        return 'NIS harus terdiri dari tepat 8 digit angka.';
+    }
+
+    if (!preg_match('/^[0-9]{10}$/', $nisn)) {
+        return 'NISN harus terdiri dari tepat 10 digit angka.';
+    }
+
+    return '';
+}
 
 // TAMBAH DATA
 if (isset($_POST['tambah'])) {
@@ -21,24 +37,41 @@ if (isset($_POST['tambah'])) {
     $alamat = $_POST['alamat'];
     $status_aktif = $_POST['status_aktif'];
 
-    $sql = "INSERT INTO t_siswa
-            (nis, nisn, nama, jenis_kelamin, tanggal_lahir, alamat, status_aktif)
-            VALUES
-            ('$nis', '$nisn', '$nama', '$jenis_kelamin', '$tanggal_lahir', '$alamat', '$status_aktif')";
+    $pesan = validasiNomorSiswa($nis, $nisn);
 
-    mysqli_query($koneksi, $sql);
+    if ($pesan == '') {
+        $sql = "INSERT INTO t_siswa
+                (nis, nisn, nama, jenis_kelamin, tanggal_lahir, alamat, status_aktif)
+                VALUES
+                ('$nis', '$nisn', '$nama', '$jenis_kelamin', '$tanggal_lahir', '$alamat', '$status_aktif')";
+
+        mysqli_query($koneksi, $sql);
+
+        header("Location: data_siswa.php");
+        exit;
+    }
+}
+
+// NONAKTIFKAN DATA SISWA (SOFT DELETE)
+if (isset($_GET['nonaktifkan'])) {
+    $id = (int)$_GET['nonaktifkan'];
+
+    mysqli_query(
+        $koneksi,
+        "UPDATE t_siswa SET status_aktif = 0 WHERE id = '$id'"
+    );
 
     header("Location: data_siswa.php");
     exit;
 }
 
-// NONAKTIFKAN DATA SISWA
-if (isset($_GET['hapus'])) {
-    $id = $_GET['hapus'];
+// HAPUS PERMANEN DATA SISWA (HARD DELETE)
+if (isset($_GET['hapus_permanen'])) {
+    $id = (int)$_GET['hapus_permanen'];
 
     mysqli_query(
         $koneksi,
-        "UPDATE t_siswa SET status_aktif = 0 WHERE id = '$id'"
+        "DELETE FROM t_siswa WHERE id = '$id'"
     );
 
     header("Location: data_siswa.php");
@@ -56,26 +89,41 @@ if (isset($_POST['edit'])) {
     $alamat = $_POST['alamat'];
     $status_aktif = $_POST['status_aktif'];
 
-    $sql = "UPDATE t_siswa SET
-            nis = '$nis',
-            nisn = '$nisn',
-            nama = '$nama',
-            jenis_kelamin = '$jenis_kelamin',
-            tanggal_lahir = '$tanggal_lahir',
-            alamat = '$alamat',
-            status_aktif = '$status_aktif'
-            WHERE id = '$id'";
+    $pesan = validasiNomorSiswa($nis, $nisn);
 
-    mysqli_query($koneksi, $sql);
+    if ($pesan == '') {
+        $sql = "UPDATE t_siswa SET
+                nis = '$nis',
+                nisn = '$nisn',
+                nama = '$nama',
+                jenis_kelamin = '$jenis_kelamin',
+                tanggal_lahir = '$tanggal_lahir',
+                alamat = '$alamat',
+                status_aktif = '$status_aktif'
+                WHERE id = '$id'";
 
-    header("Location: data_siswa.php");
-    exit;
+        mysqli_query($koneksi, $sql);
+
+        header("Location: data_siswa.php");
+        exit;
+    } else {
+        // Pertahankan data yang dimasukkan jika validasi edit gagal
+        $edit_gagal = true;
+        $data_edit = [
+            'id' => $id,
+            'nis' => $nis,
+            'nisn' => $nisn,
+            'nama' => $nama,
+            'jenis_kelamin' => $jenis_kelamin,
+            'tanggal_lahir' => $tanggal_lahir,
+            'alamat' => $alamat,
+            'status_aktif' => $status_aktif
+        ];
+    }
 }
 
 // DATA UNTUK EDIT
-$data_edit = null;
-
-if (isset($_GET['edit'])) {
+if (!$edit_gagal && isset($_GET['edit'])) {
     $id = $_GET['edit'];
 
     $hasil_edit = mysqli_query(
@@ -282,6 +330,16 @@ $data_siswa = mysqli_query(
             color: #92400e;
         }
 
+        .action-delete {
+            color: #c33d4b;
+            background: #fff0f0;
+        }
+
+        .action-delete:hover {
+            background: #ffe0e0;
+            color: #a52634;
+        }
+
         .table-count {
             color: var(--muted);
             font-size: 13px;
@@ -333,6 +391,12 @@ $data_siswa = mysqli_query(
                 </p>
             </div>
 
+            <?php if ($pesan != '') { ?>
+                <div class="alert alert-danger" role="alert">
+                    <?php echo htmlspecialchars($pesan); ?>
+                </div>
+            <?php } ?>
+
             <?php if ($data_edit) { ?>
 
                 <div class="content-card">
@@ -348,14 +412,40 @@ $data_siswa = mysqli_query(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">NIS</label>
-                                <input type="text" name="nis" class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['nis']); ?>" required>
+                               
+                                <input
+                                    type="text"
+                                    name="nis"
+                                    class="form-control"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{8}"
+                                    minlength="8"
+                                    maxlength="8"
+                                    value="<?php echo htmlspecialchars($data_edit['nis']); ?>"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8)"
+                                    title="NIS harus tepat 8 digit angka."
+                                    required
+                                >
+
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">NISN</label>
-                                <input type="text" name="nisn" class="form-control"
-                                    value="<?php echo htmlspecialchars($data_edit['nisn']); ?>" required>
+                                
+                                <input
+                                    type="text"
+                                    name="nisn"
+                                    class="form-control"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{10}"
+                                    minlength="10"
+                                    maxlength="10"
+                                    value="<?php echo htmlspecialchars($data_edit['nisn']); ?>"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
+                                    title="NISN harus tepat 10 digit angka."
+                                    required
+                                >
+
                             </div>
 
                             <div class="col-md-6">
@@ -408,17 +498,40 @@ $data_siswa = mysqli_query(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">NIS</label>
-                                <input type="text" name="nis" class="form-control" placeholder="Masukkan NIS" required>
+                                <input
+                                    type="text"
+                                    name="nis"
+                                    class="form-control"
+                                    placeholder="Masukkan NIS"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{8,}"
+                                    minlength="8"
+                                    title="NIS harus berupa angka dan minimal 8 digit."
+                                    value="<?php echo htmlspecialchars($_POST['nis'] ?? ''); ?>"
+                                    required
+                                >
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">NISN</label>
-                                <input type="text" name="nisn" class="form-control" placeholder="Masukkan NISN" required>
+                                <input
+                                    type="text"
+                                    name="nisn"
+                                    class="form-control"
+                                    placeholder="Masukkan NISN"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{10,}"
+                                    minlength="10"
+                                    title="NISN harus berupa angka dan minimal 10 digit."
+                                    value="<?php echo htmlspecialchars($_POST['nisn'] ?? ''); ?>"
+                                    required
+                                >
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">Nama Siswa</label>
-                                <input type="text" name="nama" class="form-control" placeholder="Masukkan nama siswa" required>
+                                <input type="text" name="nama" class="form-control"
+                                    placeholder="Masukkan nama siswa" required>
                             </div>
 
                             <div class="col-md-6">
@@ -445,7 +558,8 @@ $data_siswa = mysqli_query(
 
                             <div class="col-12">
                                 <label class="form-label">Alamat</label>
-                                <textarea name="alamat" class="form-control" rows="3" placeholder="Masukkan alamat siswa" required></textarea>
+                                <textarea name="alamat" class="form-control" rows="3"
+                                    placeholder="Masukkan alamat siswa" required></textarea>
                             </div>
 
                             <div class="col-12">
@@ -542,9 +656,16 @@ $data_siswa = mysqli_query(
 
                                             <?php if ($siswa['status_aktif'] == 1) { ?>
                                                 <a
-                                                    href="data_siswa.php?hapus=<?php echo (int) $siswa['id']; ?>"
+                                                    href="data_siswa.php?nonaktifkan=<?php echo (int) $siswa['id']; ?>"
                                                     class="action-link action-disable"
+                                                    onclick="return confirm('Menonaktifkan siswa ini?');"
                                                 >Nonaktifkan</a>
+                                            <?php } else { ?>
+                                                <a
+                                                    href="data_siswa.php?hapus_permanen=<?php echo (int) $siswa['id']; ?>"
+                                                    class="action-link action-delete"
+                                                    onclick="return confirm('Yakin mau hapus data ini secara permanen dari database?');"
+                                                >Hapus</a>
                                             <?php } ?>
                                         </div>
                                     </td>
