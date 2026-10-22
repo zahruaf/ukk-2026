@@ -15,13 +15,13 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
     header("Content-Type: application/vnd.ms-excel");
     header("Content-Disposition: attachment; filename=Laporan_Pelanggaran_SIPES_" . date('Y-m-d') . ".xls");
     
-    // Ambil data untuk excel
+    // Ambil data untuk excel dengan nama tabel dan kolom yang benar
     $q_export = mysqli_query($koneksi, "
-        SELECT ps.*, s.nis, s.nama_siswa, k.nama_kelas, jp.nama_pelanggaran, jp.poin
+        SELECT ps.*, s.nis, s.nama AS nama_siswa, k.nama AS nama_kelas, p.nama AS nama_pelanggaran, p.poin
         FROM t_pelanggaran_siswa ps
         JOIN t_siswa s ON ps.siswa_id = s.id
-        JOIN t_kelas k ON s.kelas_id = k.id
-        JOIN t_pelanggaran_jenis jp ON ps.pelanggaran_jenis_id = jp.id
+        JOIN t_kelas k ON ps.kelas_id = k.id
+        JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
         ORDER BY ps.tanggal DESC
     ");
     ?>
@@ -48,7 +48,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
                 <td><?= $row['nama_pelanggaran']; ?></td>
                 <td><?= $row['poin']; ?></td>
             </tr>
-            <?php endrow; endwhile; ?>
+            <?php endwhile; ?>
         </tbody>
     </table>
     <?php
@@ -63,13 +63,12 @@ $where = "";
 if (!empty($tgl_mulai) && !empty($tgl_selesai)) {
     $where = "WHERE ps.tanggal BETWEEN '$tgl_mulai' AND '$tgl_selesai'";
 }
-
 $query = mysqli_query($koneksi, "
-    SELECT ps.*, s.nis, s.nama_siswa, k.nama_kelas, jp.nama_pelanggaran, jp.poin
+    SELECT ps.*, s.nis, s.nama AS nama_siswa, k.nama AS nama_kelas, p.nama AS nama_pelanggaran, p.poin
     FROM t_pelanggaran_siswa ps
     JOIN t_siswa s ON ps.siswa_id = s.id
-    JOIN t_kelas k ON s.kelas_id = k.id
-    JOIN t_pelanggaran_jenis jp ON ps.pelanggaran_jenis_id = jp.id
+    JOIN t_kelas k ON ps.kelas_id = k.id
+    JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
     $where
     ORDER BY ps.tanggal DESC
 ");
@@ -91,9 +90,9 @@ $query = mysqli_query($koneksi, "
             --border: #e5eaf1;
         }
 
-        body { background: var(--background); }
+        body { background: var(--background); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .main-content { margin-left: 16.666667%; padding: 30px; }
-        .content-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+        .content-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
 
         /* Sembunyikan elemen pas diprint */
         @media print {
@@ -101,6 +100,7 @@ $query = mysqli_query($koneksi, "
             .no-print { display: none !important; }
             .content-card { border: none !important; box-shadow: none !important; }
         }
+        @media (max-width: 767.98px) { .main-content { margin-left: 0; padding: 15px; } }
     </style>
 </head>
 <body>
@@ -142,7 +142,7 @@ $query = mysqli_query($koneksi, "
                     <input type="date" name="tgl_selesai" class="form-control" value="<?= htmlspecialchars($tgl_selesai); ?>">
                 </div>
                 <div class="col-md-4 d-flex gap-2">
-                    <button type="submit" class="btn btn-teal text-white fw-bold w-100" style="background: var(--teal);">Filter</button>
+                    <button type="submit" class="btn text-white fw-bold w-100" style="background: var(--teal);">Filter</button>
                     <a href="laporan.php" class="btn btn-outline-secondary w-100">Reset</a>
                 </div>
             </form>
@@ -196,5 +196,6 @@ $query = mysqli_query($koneksi, "
     </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
