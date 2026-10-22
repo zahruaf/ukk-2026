@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -17,15 +16,14 @@ include 'config/koneksi.php';
 $halaman = 'kategori_pelanggaran';
 $pesan = '';
 
+// TAMBAH KATEGORI
 if (isset($_POST['tambah'])) {
     $nama = trim($_POST['nama']);
     $deskripsi = trim($_POST['deskripsi']);
 
     $sql = mysqli_prepare(
         $koneksi,
-        "INSERT INTO t_pelanggaran_kategori
-        (nama, deskripsi, status_aktif)
-        VALUES (?, ?, 1)"
+        "INSERT INTO t_pelanggaran_kategori (nama, deskripsi, status_aktif) VALUES (?, ?, 1)"
     );
 
     mysqli_stmt_bind_param($sql, "ss", $nama, $deskripsi);
@@ -40,6 +38,7 @@ if (isset($_POST['tambah'])) {
     mysqli_stmt_close($sql);
 }
 
+// EDIT KATEGORI
 if (isset($_POST['edit'])) {
     $id = (int) $_POST['id'];
     $nama = trim($_POST['nama']);
@@ -47,9 +46,7 @@ if (isset($_POST['edit'])) {
 
     $sql = mysqli_prepare(
         $koneksi,
-        "UPDATE t_pelanggaran_kategori
-        SET nama = ?, deskripsi = ?
-        WHERE id = ?"
+        "UPDATE t_pelanggaran_kategori SET nama = ?, deskripsi = ? WHERE id = ?"
     );
 
     mysqli_stmt_bind_param($sql, "ssi", $nama, $deskripsi, $id);
@@ -64,14 +61,13 @@ if (isset($_POST['edit'])) {
     mysqli_stmt_close($sql);
 }
 
+// NONAKTIFKAN KATEGORI (SOFT DELETE)
 if (isset($_POST['nonaktifkan'])) {
     $id = (int) $_POST['id'];
 
     $sql = mysqli_prepare(
         $koneksi,
-        "UPDATE t_pelanggaran_kategori
-        SET status_aktif = 0
-        WHERE id = ?"
+        "UPDATE t_pelanggaran_kategori SET status_aktif = 0 WHERE id = ?"
     );
 
     mysqli_stmt_bind_param($sql, "i", $id);
@@ -86,6 +82,28 @@ if (isset($_POST['nonaktifkan'])) {
     mysqli_stmt_close($sql);
 }
 
+// HAPUS PERMANEN KATEGORI (HARD DELETE)
+if (isset($_POST['hapus_permanen'])) {
+    $id = (int) $_POST['id'];
+
+    $sql = mysqli_prepare(
+        $koneksi,
+        "DELETE FROM t_pelanggaran_kategori WHERE id = ?"
+    );
+
+    mysqli_stmt_bind_param($sql, "i", $id);
+
+    if (mysqli_stmt_execute($sql)) {
+        mysqli_stmt_close($sql);
+        header("Location: kategori_pelanggaran.php");
+        exit;
+    }
+
+    $pesan = "Gagal menghapus kategori secara permanen.";
+    mysqli_stmt_close($sql);
+}
+
+// DATA UNTUK EDIT
 $data_edit = null;
 
 if (isset($_GET['edit'])) {
@@ -105,20 +123,10 @@ if (isset($_GET['edit'])) {
     mysqli_stmt_close($sql_edit);
 }
 
+// TAMPIL DATA KATEGORI (BERSIH & SIMPEL)
 $query = mysqli_query(
     $koneksi,
-    "SELECT k.*,
-        (
-            SELECT GROUP_CONCAT(
-                DISTINCT ps.nama_siswa
-                ORDER BY ps.nama_siswa
-                SEPARATOR ', '
-            )
-            FROM t_pelanggaran_siswa ps
-            WHERE ps.pelanggaran_kategori_id = k.id
-        ) AS nama_siswa
-     FROM t_pelanggaran_kategori k
-     ORDER BY k.id ASC"
+    "SELECT * FROM t_pelanggaran_kategori ORDER BY id ASC"
 );
 ?>
 
@@ -282,8 +290,8 @@ $query = mysqli_query(
 
         .badge-inactive {
             display: inline-block;
-            background: #eef1f5;
-            color: #667085;
+            background: #fff0dc;
+            color: #9a4b16;
             padding: 6px 10px;
             border-radius: 20px;
             font-size: 12px;
@@ -291,9 +299,9 @@ $query = mysqli_query(
         }
 
         .btn-edit {
-            background: #fff7e6;
-            color: #996500;
-            border: 1px solid #ffe3a3;
+            background: #dff8f3;
+            color: #0f766e;
+            border: 1px solid #c8f1e9;
             border-radius: 8px;
             padding: 6px 11px;
             font-size: 13px;
@@ -303,14 +311,14 @@ $query = mysqli_query(
         }
 
         .btn-edit:hover {
-            background: #ffedc2;
-            color: #805500;
+            background: #c8f1e9;
+            color: #115e59;
         }
 
         .btn-deactivate {
-            background: #fff;
-            color: #d14343;
-            border: 1px solid #f2caca;
+            background: #fff0dc;
+            color: #b45309;
+            border: 1px solid #ffe4bd;
             border-radius: 8px;
             padding: 6px 11px;
             font-size: 13px;
@@ -318,8 +326,23 @@ $query = mysqli_query(
         }
 
         .btn-deactivate:hover {
+            background: #ffe4bd;
+            color: #92400e;
+        }
+
+        .btn-delete-perm {
             background: #fff0f0;
-            color: #b42323;
+            color: #c33d4b;
+            border: 1px solid #ffe0e0;
+            border-radius: 8px;
+            padding: 6px 11px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .btn-delete-perm:hover {
+            background: #ffe0e0;
+            color: #a52634;
         }
 
         .alert {
@@ -334,7 +357,7 @@ $query = mysqli_query(
 
         @media (max-width: 767.98px) {
             .main-content {
-                margin-left: 41.666667%;
+                margin-left: 0;
                 padding: 20px 14px;
             }
 
@@ -346,13 +369,6 @@ $query = mysqli_query(
             .table thead th,
             .table tbody td {
                 padding: 12px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .main-content {
-                margin-left: 44%;
-                padding: 16px 10px;
             }
         }
     </style>
@@ -404,23 +420,6 @@ $query = mysqli_query(
                             value="<?= (int) $data_edit['id']; ?>"
                         >
                     <?php endif; ?>
-
-                     <div class="mb-3">
-                        <label for="nama" class="form-label">
-                            Nama Siswa
-                        </label>
-
-                        <input
-                            type="text"
-                            id="nama"
-                            name="nama"
-                            class="form-control"
-                            maxlength="100"
-                            placeholder="Masukkan nama siswa"
-                            value="<?= htmlspecialchars($data_edit['nama_siswa'] ?? ''); ?>"
-                            required
-                        >
-                    </div>
 
                     <div class="mb-3">
                         <label for="nama" class="form-label">
@@ -493,7 +492,6 @@ $query = mysqli_query(
                     <thead>
                         <tr>
                             <th>No</th>
-                            <th>Nama Siswa</th>
                             <th>Nama Kategori</th>
                             <th>Deskripsi</th>
                             <th>Status</th>
@@ -508,10 +506,6 @@ $query = mysqli_query(
                             <?php while ($data = mysqli_fetch_assoc($query)): ?>
                                 <tr>
                                     <td><?= $no++; ?></td>
-
-                                    <td>
-                                        <?= htmlspecialchars($data['nama_siswa'] ?? '-'); ?>
-                                    </td>
 
                                     <td>
                                         <strong>
@@ -544,7 +538,7 @@ $query = mysqli_query(
                                                 <form
                                                     method="POST"
                                                     action="kategori_pelanggaran.php"
-                                                    onsubmit="return confirm('Yakin ingin menonaktifkan kategori ini?')"
+                                                    onsubmit="return confirm('Menonaktifkan kategori ini?')"
                                                 >
                                                     <input
                                                         type="hidden"
@@ -560,6 +554,26 @@ $query = mysqli_query(
                                                         Nonaktifkan
                                                     </button>
                                                 </form>
+                                            <?php else: ?>
+                                                <form
+                                                    method="POST"
+                                                    action="kategori_pelanggaran.php"
+                                                    onsubmit="return confirm('Yakin mau hapus kategori ini secara permanen dari database?')"
+                                                >
+                                                    <input
+                                                        type="hidden"
+                                                        name="id"
+                                                        value="<?= (int) $data['id']; ?>"
+                                                    >
+
+                                                    <button
+                                                        type="submit"
+                                                        name="hapus_permanen"
+                                                        class="btn-delete-perm"
+                                                    >
+                                                        Hapus
+                                                    </button>
+                                                </form>
                                             <?php endif; ?>
                                         </div>
                                     </td>
@@ -568,7 +582,7 @@ $query = mysqli_query(
 
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" class="empty-state">
+                                <td colspan="5" class="empty-state">
                                     Belum ada data kategori pelanggaran.
                                 </td>
                             </tr>

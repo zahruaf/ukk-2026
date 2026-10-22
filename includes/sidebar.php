@@ -1,4 +1,3 @@
-
 <?php
 $role = $_SESSION['role'] ?? '';
 ?>
@@ -16,6 +15,7 @@ $role = $_SESSION['role'] ?? '';
 
     <ul class="nav nav-pills flex-column gap-1">
 
+        <!-- DASHBOARD (SEMUA ROLE) -->
         <li class="nav-item">
             <a href="dashboard.php"
                class="nav-link <?= ($halaman == 'dashboard') ? 'active' : '' ?>">
@@ -24,8 +24,8 @@ $role = $_SESSION['role'] ?? '';
             </a>
         </li>
 
-        <?php if ($role == 'admin') { ?>
-
+        <?php if ($role == 'admin'): ?>
+            <!-- ================= MENU KHUSUS ADMIN (MASTER DATA) ================= -->
             <li class="nav-item">
                 <a href="data_siswa.php"
                    class="nav-link <?= ($halaman == 'siswa') ? 'active' : '' ?>">
@@ -42,17 +42,13 @@ $role = $_SESSION['role'] ?? '';
                 </a>
             </li>
 
-        <?php } ?>
-
-        <li class="nav-item">
-            <a href="kelas.php"
-               class="nav-link <?= ($halaman == 'kelas') ? 'active' : '' ?>">
-                <span class="menu-mark">K</span>
-                Kelas
-            </a>
-        </li>
-
-        <?php if ($role == 'admin') { ?>
+            <li class="nav-item">
+                <a href="kelas.php"
+                   class="nav-link <?= ($halaman == 'kelas') ? 'active' : '' ?>">
+                    <span class="menu-mark">K</span>
+                    Kelas
+                </a>
+            </li>
 
             <li class="nav-item">
                 <a href="tahun_ajaran.php"
@@ -77,16 +73,41 @@ $role = $_SESSION['role'] ?? '';
                     Kategori Pelanggaran
                 </a>
             </li>
+        <?php endif; ?>
 
-        <?php } ?>
+        <!-- ================= MENU KHUSUS GURU / PETUGAS (OPERASIONAL) ================= -->
+        <?php if ($role != 'admin'): ?>
+            <li class="nav-item">
+                <a href="tindakan.php"
+                   class="nav-link <?= ($halaman == 'tindakan') ? 'active' : '' ?>">
+                    <span class="menu-mark">T</span>
+                    Tindakan
+                </a>
+            </li>
+        <?php endif; ?>
 
-        <li class="nav-item">
+            <?php if ($role != 'admin'): ?>
+         <li class="nav-item">
             <a href="pelanggaran_siswa.php"
                class="nav-link <?= ($halaman == 'pelanggaran_siswa') ? 'active' : '' ?>">
                 <span class="menu-mark">P</span>
                 Pencatatan Pelanggaran
             </a>
         </li>
+        <?php endif; ?>
+
+        <?php if ($role != 'admin'): ?>
+    <li class="nav-item">
+        <a href="rekap_poin.php"
+           class="nav-link <?= ($halaman == 'rekap_poin') ? 'active' : '' ?>">
+            <span class="menu-mark">R</span>
+            Riwayat & Rekap Poin
+        </a>
+    </li>
+<?php endif; ?>
+
+        <!-- ================= MENU BERSAMA (ADMIN & GURU) ================= -->
+       
 
         <li class="nav-item">
             <a href="laporan.php"
@@ -96,7 +117,7 @@ $role = $_SESSION['role'] ?? '';
             </a>
         </li>
 
-        <?php if ($role == 'admin') { ?>
+        <?php if ($role == 'admin'): ?>
             <li class="nav-item">
                 <a href="about.php"
                    class="nav-link <?= ($halaman == 'about') ? 'active' : '' ?>">
@@ -104,7 +125,7 @@ $role = $_SESSION['role'] ?? '';
                     About
                 </a>
             </li>
-        <?php } ?>
+        <?php endif; ?>
 
     </ul>
 
@@ -118,7 +139,7 @@ $role = $_SESSION['role'] ?? '';
                 <div class="user-name">
                     <?= htmlspecialchars($_SESSION['name'] ?? 'Pengguna') ?>
                 </div>
-                <small><?= $role == 'admin' ? 'Administrator' : 'Petugas' ?></small>
+                <small><?= $role == 'admin' ? 'Administrator' : 'Petugas / Guru' ?></small>
             </div>
         </div>
 
