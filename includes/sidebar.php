@@ -50,6 +50,15 @@ $role = $_SESSION['role'] ?? '';
                 </a>
             </li>
 
+            <!-- MENU TAMBAHAN: WALI KELAS -->
+            <li class="nav-item">
+                <a href="wali_kelas.php"
+                   class="nav-link <?= ($halaman == 'wali_kelas') ? 'active' : '' ?>">
+                    <span class="menu-mark">W</span>
+                    Wali Kelas
+                </a>
+            </li>
+
             <li class="nav-item">
                 <a href="tahun_ajaran.php"
                    class="nav-link <?= ($halaman == 'tahun_ajaran') ? 'active' : '' ?>">
@@ -107,8 +116,6 @@ $role = $_SESSION['role'] ?? '';
 <?php endif; ?>
 
         <!-- ================= MENU BERSAMA (ADMIN & GURU) ================= -->
-       
-
         <li class="nav-item">
             <a href="laporan.php"
                class="nav-link <?= ($halaman == 'laporan') ? 'active' : '' ?>">

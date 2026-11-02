@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -6,6 +5,8 @@ if (!isset($_SESSION['login'])) {
     header("Location: login.php");
     exit;
 }
+
+include 'config/koneksi.php';
 
 $halaman = 'dashboard';
 
@@ -17,6 +18,26 @@ if ($role_pengguna == 'admin') {
 } else {
     $label_role = 'Guru';
 }
+
+// MENGAMBIL TOTAL DATA UNTUK KARTU STATISTIK
+$q_siswa = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_siswa WHERE status_aktif = 1");
+$total_siswa = mysqli_fetch_assoc($q_siswa)['total'] ?? 0;
+
+$q_guru = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_guru WHERE status_aktif = 1");
+$total_guru = mysqli_fetch_assoc($q_guru)['total'] ?? 0;
+
+$q_kelas = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_kelas WHERE status_aktif = 1");
+$total_kelas = mysqli_fetch_assoc($q_kelas)['total'] ?? 0;
+
+// MENGAMBIL DATA PELANGGARAN TERBARU UNTUK BAGIAN BAWAH
+$q_terbaru = mysqli_query($koneksi, "
+    SELECT ps.tanggal, s.nama AS nama_siswa, k.nama AS nama_kelas, p.nama AS nama_pelanggaran, ps.poin 
+    FROM t_pelanggaran_siswa ps
+    JOIN t_siswa s ON ps.siswa_id = s.id
+    JOIN t_kelas k ON ps.kelas_id = k.id
+    JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
+    ORDER BY ps.id DESC LIMIT 5
+");
 ?>
 
 <!DOCTYPE html>
@@ -181,6 +202,14 @@ if ($role_pengguna == 'admin') {
             color: #ffffff;
         }
 
+        .content-card {
+            background: #fff;
+            border: 1px solid #e5eaf1;
+            border-radius: 15px;
+            padding: 24px;
+            box-shadow: 0 5px 20px rgba(16, 28, 53, 0.04);
+        }
+
         @media (max-width: 767.98px) {
             main {
                 padding: 20px !important;
@@ -207,42 +236,6 @@ if ($role_pengguna == 'admin') {
 
             .stat-number {
                 font-size: 28px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            main {
-                margin-left: 44%;
-                width: 56%;
-                padding: 12px !important;
-            }
-
-            .dashboard-header h2 {
-                font-size: 23px;
-            }
-
-            .role-badge {
-                font-size: 10px;
-            }
-
-            .welcome-card {
-                padding: 15px;
-            }
-
-            .welcome-card h3 {
-                font-size: 17px;
-            }
-
-            .welcome-card p {
-                font-size: 12px;
-            }
-
-            .stat-card .card-body {
-                padding: 12px;
-            }
-
-            .stat-number {
-                font-size: 24px;
             }
         }
     </style>
@@ -280,7 +273,7 @@ if ($role_pengguna == 'admin') {
 
             <h5 class="section-title">Ringkasan Data</h5>
 
-            <div class="row">
+            <div class="row mb-4">
 
                 <div class="col-md-4 mb-3">
                     <div class="card stat-card">
@@ -289,7 +282,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Data Siswa</div>
 
-                            <h2 class="stat-number"></h2>
+                            <h2 class="stat-number"><?= $total_siswa; ?></h2>
 
                             <a href="data_siswa.php" class="btn-teal">
                                 LIHAT DATA
@@ -305,7 +298,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Data Guru</div>
 
-                            <h2 class="stat-number"></h2>
+                            <h2 class="stat-number"><?= $total_guru; ?></h2>
 
                             <?php if ($role_pengguna == 'admin') { ?>
                                 <a href="data_guru.php" class="btn-teal">
@@ -327,7 +320,7 @@ if ($role_pengguna == 'admin') {
 
                             <div class="stat-label">Kelas</div>
 
-                            <h2 class="stat-number"></h2>
+                            <h2 class="stat-number"><?= $total_kelas; ?></h2>
 
                             <a href="kelas.php" class="btn-teal">
                                 LIHAT DATA
@@ -338,9 +331,49 @@ if ($role_pengguna == 'admin') {
 
             </div>
 
+            <!-- TAMBAHAN BAGIAN BAWAH: TABEL PELANGGARAN TERBARU BIAR TIDAK KOSONG -->
+            <div class="content-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="section-title m-0">Aktivitas / Pelanggaran Terbaru</h5>
+                    <a href="laporan.php" class="btn btn-sm btn-outline-secondary rounded-3">Lihat Semua</a>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Nama Siswa</th>
+                                <th>Kelas</th>
+                                <th>Pelanggaran</th>
+                                <th class="text-center">Poin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($q_terbaru && mysqli_num_rows($q_terbaru) > 0): ?>
+                                <?php while ($row = mysqli_fetch_assoc($q_terbaru)): ?>
+                                    <tr>
+                                        <td><?= date('d/m/Y', strtotime($row['tanggal'])); ?></td>
+                                        <td><strong><?= htmlspecialchars($row['nama_siswa']); ?></strong></td>
+                                        <td><?= htmlspecialchars($row['nama_kelas']); ?></td>
+                                        <td><?= htmlspecialchars($row['nama_pelanggaran']); ?></td>
+                                        <td class="text-center"><span class="badge bg-danger"><?= $row['poin']; ?> Poin</span></td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">Belum ada catatan pelanggaran terbaru.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </main>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
