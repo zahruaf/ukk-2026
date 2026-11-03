@@ -59,13 +59,45 @@ if (isset($_GET['edit'])) {
     $data_edit = mysqli_fetch_assoc($hasil_edit);
 }
 
-// TAMPIL DATA WALI KELAS (JOIN DENGAN KELAS DAN GURU)
+/*
+|--------------------------------------------------------------------------
+| KONFIGURASI PAGINATION & PENCARIAN WALI KELAS (SQL-BASED)
+|--------------------------------------------------------------------------
+*/
+$batas = 10; // Jumlah data per halaman
+$halaman_aktif = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$halaman_aktif = ($halaman_aktif < 1) ? 1 : $halaman_aktif;
+$mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
+
+$cari = trim($_GET['cari'] ?? '');
+$where_sql = "";
+
+if ($cari !== '') {
+    $cari_esc = mysqli_real_escape_string($koneksi, $cari);
+    $where_sql = "WHERE k.nama LIKE '%$cari_esc%' OR k.tingkat LIKE '%$cari_esc%' OR k.jurusan LIKE '%$cari_esc%' OR g.nama LIKE '%$cari_esc%'";
+}
+
+// Hitung total data sesuai pencarian
+$query_jml = mysqli_query($koneksi, "
+    SELECT COUNT(*) AS total 
+    FROM t_wali_kelas wk
+    JOIN t_kelas k ON wk.kelas_id = k.id
+    JOIN t_guru g ON wk.guru_id = g.id
+    $where_sql
+");
+$row_jml = mysqli_fetch_assoc($query_jml);
+$total_data = $row_jml['total'];
+$total_halaman = ceil($total_data / $batas);
+
+// TAMPIL DATA WALI KELAS (JOIN DENGAN KELAS DAN GURU + LIMIT OFFSET)
 $data_wali = mysqli_query($koneksi, "
     SELECT wk.*, k.nama AS nama_kelas, k.tingkat, k.jurusan, g.nama AS nama_guru 
     FROM t_wali_kelas wk
     JOIN t_kelas k ON wk.kelas_id = k.id
     JOIN t_guru g ON wk.guru_id = g.id
-    ORDER BY wk.id ASC
+    $where_sql
+    ORDER BY wk.id ASC 
+    LIMIT $mulai, $batas
 ");
 
 // AMBIL DATA LIST KELAS & GURU UNTUK DROPDOWN FORM
@@ -337,7 +369,7 @@ $list_guru = mysqli_query($koneksi, "SELECT * FROM t_guru WHERE status_aktif = 1
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label">Pilih Guru Wali</label>
+                                <label class="form-label">Pilih Guru</label>
                                 <select class="form-select" name="guru_id" required>
                                     <option value="">-- Pilih Guru --</option>
                                     <?php 
@@ -383,7 +415,7 @@ $list_guru = mysqli_query($koneksi, "SELECT * FROM t_guru WHERE status_aktif = 1
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label">Pilih Guru Wali</label>
+                                <label class="form-label">Pilih Guru</label>
                                 <select class="form-select" name="guru_id" required>
                                     <option value="">-- Pilih Guru --</option>
                                     <?php while($g = mysqli_fetch_assoc($list_guru)): ?>
@@ -413,22 +445,26 @@ $list_guru = mysqli_query($koneksi, "SELECT * FROM t_guru WHERE status_aktif = 1
                 <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
                     <div>
                         <h2 class="section-title mb-1">Daftar Wali Kelas</h2>
-                        <p class="table-count mb-0">Daftar kelas beserta guru pengampunya.</p>
+                        <p class="table-count mb-0">Total data: <?= $total_data; ?> penugasan</p>
                     </div>
 
+                    <!-- FORM PENCARIAN (GET METHOD) -->
                     <div class="search-area">
-                        <label for="cariWali" class="form-label">Cari Data</label>
-                        <div class="d-flex gap-2">
-                            <input type="search" id="cariWali" class="form-control" placeholder="Cari kelas atau nama guru...">
-                            <button type="button" id="resetCariWali" class="btn-light-custom">Reset</button>
-                        </div>
+                        <form method="GET" action="wali_kelas.php">
+                            <label for="cari" class="form-label">Cari Data</label>
+                            <div class="d-flex gap-2">
+                                <input type="search" name="cari" id="cari" class="form-control" placeholder="Cari kelas atau nama guru..." value="<?= htmlspecialchars($cari); ?>">
+                                <button type="submit" class="btn btn-teal">Cari</button>
+                                <?php if ($cari !== '') { ?>
+                                    <a href="wali_kelas.php" class="btn-light-custom">Reset</a>
+                                <?php } ?>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
-                <p id="hasilPencarianWali" class="table-count mb-3"></p>
-
                 <div class="table-responsive">
-                    <table class="table" id="tabelWali">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>No</th>
@@ -441,8 +477,9 @@ $list_guru = mysqli_query($koneksi, "SELECT * FROM t_guru WHERE status_aktif = 1
                         </thead>
                         <tbody>
                             <?php 
-                            $no = 1;
-                            while ($d = mysqli_fetch_assoc($data_wali)) { 
+                            $no = $mulai + 1;
+                            if (mysqli_num_rows($data_wali) > 0) {
+                                while ($d = mysqli_fetch_assoc($data_wali)) { 
                             ?>
                             <tr>
                                 <td><?= $no++; ?></td>
@@ -463,53 +500,48 @@ $list_guru = mysqli_query($koneksi, "SELECT * FROM t_guru WHERE status_aktif = 1
                                     </div>
                                 </td>
                             </tr>
-                            <?php } ?>
-
-                            <tr id="pesanWaliKosong" style="display: none;">
+                            <?php 
+                                }
+                            } else { 
+                            ?>
+                            <tr>
                                 <td colspan="6" class="empty-state">Data wali kelas tidak ditemukan.</td>
                             </tr>
+                            <?php } ?>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- NAVIGASI PAGINATION WALI KELAS -->
+                <?php if ($total_halaman > 1) { ?>
+                    <nav class="mt-4">
+                        <ul class="pagination justify-content-end mb-0">
+                            <!-- Tombol Previous -->
+                            <li class="page-item <?= ($halaman_aktif <= 1) ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="wali_kelas.php?page=<?= $halaman_aktif - 1; ?><?= $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Previous</a>
+                            </li>
+
+                            <!-- Angka Halaman -->
+                            <?php for ($i = 1; $i <= $total_halaman; $i++) { ?>
+                                <li class="page-item <?= ($halaman_aktif == $i) ? 'active' : ''; ?>">
+                                    <a class="page-link" href="wali_kelas.php?page=<?= $i; ?><?= $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>" style="<?= ($halaman_aktif == $i) ? 'background-color: var(--teal); border-color: var(--teal); color: white;' : 'color: var(--navy);'; ?>"><?= $i; ?></a>
+                                </li>
+                            <?php } ?>
+
+                            <!-- Tombol Next -->
+                            <li class="page-item <?= ($halaman_aktif >= $total_halaman) ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="wali_kelas.php?page=<?= $halaman_aktif + 1; ?><?= $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                <?php } ?>
+
             </div>
 
         </main>
     </div>
 </div>
 
-<script>
-const inputCariWali = document.getElementById('cariWali');
-const tombolResetWali = document.getElementById('resetCariWali');
-const tabelWali = document.getElementById('tabelWali');
-const pesanWaliKosong = document.getElementById('pesanWaliKosong');
-const hasilPencarianWali = document.getElementById('hasilPencarianWali');
-
-function cariDataWali() {
-    const kataKunci = inputCariWali.value.toLowerCase().trim();
-    const semuaBaris = Array.from(tabelWali.querySelectorAll('tbody tr')).filter(baris => baris.id !== 'pesanWaliKosong');
-    let jumlahTampil = 0;
-
-    semuaBaris.forEach(baris => {
-        const teksBaris = [baris.cells[1], baris.cells[2], baris.cells[3], baris.cells[4]]
-            .map(kolom => kolom.textContent).join(' ').toLowerCase();
-
-        const cocok = teksBaris.includes(kataKunci);
-        baris.style.display = cocok ? '' : 'none';
-        if (cocok) jumlahTampil++;
-    });
-
-    pesanWaliKosong.style.display = jumlahTampil === 0 ? '' : 'none';
-    hasilPencarianWali.textContent = kataKunci === '' ? 'Total data: ' + semuaBaris.length + ' penugasan' : jumlahTampil + ' data ditemukan';
-}
-
-inputCariWali.addEventListener('input', cariDataWali);
-tombolResetWali.addEventListener('click', function () {
-    inputCariWali.value = '';
-    cariDataWali();
-    inputCariWali.focus();
-});
-cariDataWali();
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

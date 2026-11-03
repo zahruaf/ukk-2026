@@ -24,26 +24,34 @@ $role = $_SESSION['role'] ?? '';
     <style>
         :root {
             --navy: #101c35;
+            --navy-hover: #20314d;
             --teal: #14b8a6;
             --background: #f4f7fb;
+            --text: #263449;
+            --muted: #718096;
             --border: #e5eaf1;
         }
 
         body {
             background-color: var(--background);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
         }
 
         .main-content {
             margin-left: 16.666667%;
             padding: 30px;
+            min-height: 100vh;
         }
 
-        .about-card {
+        .content-card {
             max-width: 600px;
             background: #ffffff;
             border: 1px solid var(--border);
             border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(16, 28, 53, 0.04);
+            overflow: hidden;
         }
 
         .profile {
@@ -53,10 +61,14 @@ $role = $_SESSION['role'] ?? '';
             border: 3px solid var(--teal);
         }
 
+        .form-label, h5, h2 {
+            color: var(--navy);
+        }
+
         @media (max-width: 767.98px) {
             .main-content {
                 margin-left: 0;
-                padding: 15px;
+                padding: 20px 14px;
             }
         }
     </style>
@@ -69,14 +81,14 @@ $role = $_SESSION['role'] ?? '';
     <main class="main-content">
         <div class="container-fluid p-0 d-flex justify-content-center">
 
-            <div class="card about-card shadow-sm w-100 p-2">
+            <div class="content-card w-100 p-2">
                 <div class="card-body p-4">
 
                     <div class="text-center mb-4">
                         <!-- Foto -->
                         <img src="https://via.placeholder.com/120" class="rounded-circle profile shadow-sm" alt="Foto Profil">
 
-                        <h2 class="mt-3 mb-1 fw-bold" style="color: var(--navy);">
+                        <h2 class="mt-3 mb-1 fw-bold">
                             Muhammad zahru a.f
                         </h2>
 
@@ -87,7 +99,7 @@ $role = $_SESSION['role'] ?? '';
 
                     <hr class="text-muted opacity-25">
 
-                    <h5 class="fw-bold" style="color: var(--navy);">Tentang Saya</h5>
+                    <h5 class="fw-bold">Tentang Saya</h5>
 
                     <p class="text-secondary">
                         Halo, nama saya <strong>Muhammad zahru a.f</strong>.
@@ -96,7 +108,7 @@ $role = $_SESSION['role'] ?? '';
                         HTML, CSS, PHP, MySQL, dan Bootstrap.
                     </p>
 
-                    <h5 class="mt-4 fw-bold" style="color: var(--navy);">Data Diri</h5>
+                    <h5 class="mt-4 fw-bold">Data Diri</h5>
 
                     <div class="mb-2 text-secondary">
                         <strong>Nama:</strong> Muhammad zahru a.f

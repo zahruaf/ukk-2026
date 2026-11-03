@@ -25,7 +25,6 @@ if (isset($_POST['tambah'])) {
         $koneksi,
         "INSERT INTO t_pelanggaran_kategori (nama, deskripsi, status_aktif) VALUES (?, ?, 1)"
     );
-
     mysqli_stmt_bind_param($sql, "ss", $nama, $deskripsi);
 
     if (mysqli_stmt_execute($sql)) {
@@ -48,7 +47,6 @@ if (isset($_POST['edit'])) {
         $koneksi,
         "UPDATE t_pelanggaran_kategori SET nama = ?, deskripsi = ? WHERE id = ?"
     );
-
     mysqli_stmt_bind_param($sql, "ssi", $nama, $deskripsi, $id);
 
     if (mysqli_stmt_execute($sql)) {
@@ -69,7 +67,6 @@ if (isset($_POST['nonaktifkan'])) {
         $koneksi,
         "UPDATE t_pelanggaran_kategori SET status_aktif = 0 WHERE id = ?"
     );
-
     mysqli_stmt_bind_param($sql, "i", $id);
 
     if (mysqli_stmt_execute($sql)) {
@@ -90,7 +87,6 @@ if (isset($_POST['hapus_permanen'])) {
         $koneksi,
         "DELETE FROM t_pelanggaran_kategori WHERE id = ?"
     );
-
     mysqli_stmt_bind_param($sql, "i", $id);
 
     if (mysqli_stmt_execute($sql)) {
@@ -105,7 +101,6 @@ if (isset($_POST['hapus_permanen'])) {
 
 // DATA UNTUK EDIT
 $data_edit = null;
-
 if (isset($_GET['edit'])) {
     $id_edit = (int) $_GET['edit'];
 
@@ -113,20 +108,42 @@ if (isset($_GET['edit'])) {
         $koneksi,
         "SELECT * FROM t_pelanggaran_kategori WHERE id = ?"
     );
-
     mysqli_stmt_bind_param($sql_edit, "i", $id_edit);
     mysqli_stmt_execute($sql_edit);
 
     $hasil_edit = mysqli_stmt_get_result($sql_edit);
     $data_edit = mysqli_fetch_assoc($hasil_edit);
-
     mysqli_stmt_close($sql_edit);
 }
 
-// TAMPIL DATA KATEGORI (BERSIH & SIMPEL)
+/*
+|--------------------------------------------------------------------------
+| KONFIGURASI PAGINATION & PENCARIAN (SQL-BASED)
+|--------------------------------------------------------------------------
+*/
+$batas = 10; // Jumlah data per halaman
+$halaman_aktif = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$halaman_aktif = ($halaman_aktif < 1) ? 1 : $halaman_aktif;
+$mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
+
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$where_sql = "";
+
+if ($search !== '') {
+    $search_esc = mysqli_real_escape_string($koneksi, $search);
+    $where_sql = "WHERE nama LIKE '%$search_esc%' OR deskripsi LIKE '%$search_esc%'";
+}
+
+// Hitung total data sesuai pencarian untuk pagination
+$query_jml = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_pelanggaran_kategori $where_sql");
+$row_jml = mysqli_fetch_assoc($query_jml);
+$total_data = $row_jml['total'];
+$total_halaman = ceil($total_data / $batas);
+
+// TAMPIL DATA KATEGORI DENGAN LIMIT & OFFSET
 $query = mysqli_query(
     $koneksi,
-    "SELECT * FROM t_pelanggaran_kategori ORDER BY id ASC"
+    "SELECT * FROM t_pelanggaran_kategori $where_sql ORDER BY id ASC LIMIT $mulai, $batas"
 );
 ?>
 
@@ -135,14 +152,8 @@ $query = mysqli_query(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Kategori Pelanggaran - SIPES</title>
-
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
             --navy: #101c35;
@@ -242,6 +253,7 @@ $query = mysqli_query(
             padding: 9px 16px;
             font-weight: 600;
             text-decoration: none;
+            display: inline-block;
         }
 
         .btn-cancel:hover {
@@ -323,6 +335,7 @@ $query = mysqli_query(
             padding: 6px 11px;
             font-size: 13px;
             font-weight: 600;
+            cursor: pointer;
         }
 
         .btn-deactivate:hover {
@@ -338,6 +351,7 @@ $query = mysqli_query(
             padding: 6px 11px;
             font-size: 13px;
             font-weight: 600;
+            cursor: pointer;
         }
 
         .btn-delete-perm:hover {
@@ -360,16 +374,6 @@ $query = mysqli_query(
                 margin-left: 0;
                 padding: 20px 14px;
             }
-
-            .card-heading,
-            .card-body-custom {
-                padding: 18px;
-            }
-
-            .table thead th,
-            .table tbody td {
-                padding: 12px;
-            }
         }
     </style>
 </head>
@@ -382,100 +386,42 @@ $query = mysqli_query(
     <div class="container-fluid p-0">
 
         <h2 class="page-title">Kategori Pelanggaran</h2>
-        <p class="page-subtitle">
-            Kelola kategori pelanggaran siswa.
-        </p>
+        <p class="page-subtitle">Kelola kategori pelanggaran siswa.</p>
 
         <?php if ($pesan != ''): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($pesan); ?>
-
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="alert"
-                    aria-label="Close"
-                ></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
 
         <section class="content-card">
             <div class="card-heading">
-                <h5>
-                    <?= $data_edit ? 'Edit Kategori' : 'Tambah Kategori'; ?>
-                </h5>
+                <h5><?= $data_edit ? 'Edit Kategori' : 'Tambah Kategori'; ?></h5>
             </div>
 
             <div class="card-body-custom">
-                <form
-                    method="POST"
-                    action="<?= $data_edit
-                        ? 'kategori_pelanggaran.php?edit=' . (int) $data_edit['id']
-                        : 'kategori_pelanggaran.php'; ?>"
-                >
+                <form method="POST" action="<?= $data_edit ? 'kategori_pelanggaran.php?edit=' . (int) $data_edit['id'] : 'kategori_pelanggaran.php'; ?>">
                     <?php if ($data_edit): ?>
-                        <input
-                            type="hidden"
-                            name="id"
-                            value="<?= (int) $data_edit['id']; ?>"
-                        >
+                        <input type="hidden" name="id" value="<?= (int) $data_edit['id']; ?>">
                     <?php endif; ?>
 
                     <div class="mb-3">
-                        <label for="nama" class="form-label">
-                            Nama Kategori
-                        </label>
-
-                        <input
-                            type="text"
-                            id="nama"
-                            name="nama"
-                            class="form-control"
-                            maxlength="100"
-                            placeholder="Masukkan nama kategori"
-                            value="<?= htmlspecialchars($data_edit['nama'] ?? ''); ?>"
-                            required
-                        >
+                        <label for="nama" class="form-label">Nama Kategori</label>
+                        <input type="text" id="nama" name="nama" class="form-control" maxlength="100" placeholder="Masukkan nama kategori" value="<?= htmlspecialchars($data_edit['nama'] ?? ''); ?>" required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="deskripsi" class="form-label">
-                            Deskripsi
-                        </label>
-
-                        <textarea
-                            id="deskripsi"
-                            name="deskripsi"
-                            class="form-control"
-                            rows="3"
-                            placeholder="Masukkan deskripsi kategori"
-                        ><?= htmlspecialchars($data_edit['deskripsi'] ?? ''); ?></textarea>
+                        <label for="deskripsi" class="form-label">Deskripsi</label>
+                        <textarea id="deskripsi" name="deskripsi" class="form-control" rows="3" placeholder="Masukkan deskripsi kategori"><?= htmlspecialchars($data_edit['deskripsi'] ?? ''); ?></textarea>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 mt-4">
                         <?php if ($data_edit): ?>
-                            <button
-                                type="submit"
-                                name="edit"
-                                class="btn btn-teal"
-                            >
-                                Simpan Perubahan
-                            </button>
-
-                            <a
-                                href="kategori_pelanggaran.php"
-                                class="btn-cancel"
-                            >
-                                Batal
-                            </a>
+                            <button type="submit" name="edit" class="btn btn-teal">Simpan Perubahan</button>
+                            <a href="kategori_pelanggaran.php" class="btn-cancel">Batal</a>
                         <?php else: ?>
-                            <button
-                                type="submit"
-                                name="tambah"
-                                class="btn btn-teal"
-                            >
-                                Tambah Kategori
-                            </button>
+                            <button type="submit" name="tambah" class="btn btn-teal">Tambah Kategori</button>
                         <?php endif; ?>
                     </div>
                 </form>
@@ -483,8 +429,26 @@ $query = mysqli_query(
         </section>
 
         <section class="content-card">
-            <div class="card-heading">
-                <h5>Daftar Kategori Pelanggaran</h5>
+            <div class="card-heading d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                    <h5>Daftar Kategori Pelanggaran</h5>
+                    <small class="text-muted">Total data: <?= $total_data; ?> kategori</small>
+                </div>
+                <div>
+                    <form method="GET" action="kategori_pelanggaran.php" class="d-flex align-items-center gap-2">
+                        <div class="d-flex flex-column">
+                            <label class="form-label mb-1" style="font-size: 11px;">Cari Kategori</label>
+                            <input type="text" name="search" value="<?= htmlspecialchars($search); ?>" placeholder="Cari nama atau deskripsi..." class="form-control form-control-sm" style="width: 240px;">
+                        </div>
+                        <div class="d-flex align-items-end" style="margin-top: 19px;">
+                            <?php if ($search !== ''): ?>
+                                <a href="kategori_pelanggaran.php" class="btn btn-outline-secondary btn-sm" style="padding: 6px 12px; border-radius: 9px;">Reset</a>
+                            <?php else: ?>
+                                <button type="submit" class="btn btn-teal btn-sm" style="padding: 6px 14px; border-radius: 9px;">Cari</button>
+                            <?php endif; ?>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -501,22 +465,12 @@ $query = mysqli_query(
 
                     <tbody>
                         <?php if ($query && mysqli_num_rows($query) > 0): ?>
-                            <?php $no = 1; ?>
-
+                            <?php $no = $mulai + 1; ?>
                             <?php while ($data = mysqli_fetch_assoc($query)): ?>
                                 <tr>
                                     <td><?= $no++; ?></td>
-
-                                    <td>
-                                        <strong>
-                                            <?= htmlspecialchars($data['nama'] ?? '-'); ?>
-                                        </strong>
-                                    </td>
-
-                                    <td>
-                                        <?= htmlspecialchars($data['deskripsi'] ?? ''); ?>
-                                    </td>
-
+                                    <td><strong><?= htmlspecialchars($data['nama'] ?? '-'); ?></strong></td>
+                                    <td><?= htmlspecialchars($data['deskripsi'] ?? ''); ?></td>
                                     <td>
                                         <?php if ($data['status_aktif'] == 1): ?>
                                             <span class="badge-active">Aktif</span>
@@ -524,72 +478,56 @@ $query = mysqli_query(
                                             <span class="badge-inactive">Tidak Aktif</span>
                                         <?php endif; ?>
                                     </td>
-
                                     <td>
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a
-                                                href="kategori_pelanggaran.php?edit=<?= (int) $data['id']; ?>"
-                                                class="btn-edit"
-                                            >
-                                                Edit
-                                            </a>
+                                            <a href="kategori_pelanggaran.php?edit=<?= (int) $data['id']; ?>" class="btn-edit">Edit</a>
 
                                             <?php if ($data['status_aktif'] == 1): ?>
-                                                <form
-                                                    method="POST"
-                                                    action="kategori_pelanggaran.php"
-                                                    onsubmit="return confirm('Menonaktifkan kategori ini?')"
-                                                >
-                                                    <input
-                                                        type="hidden"
-                                                        name="id"
-                                                        value="<?= (int) $data['id']; ?>"
-                                                    >
-
-                                                    <button
-                                                        type="submit"
-                                                        name="nonaktifkan"
-                                                        class="btn-deactivate"
-                                                    >
-                                                        Nonaktifkan
-                                                    </button>
+                                                <form method="POST" action="kategori_pelanggaran.php" onsubmit="return confirm('Menonaktifkan kategori ini?')">
+                                                    <input type="hidden" name="id" value="<?= (int) $data['id']; ?>">
+                                                    <button type="submit" name="nonaktifkan" class="btn-deactivate">Nonaktifkan</button>
                                                 </form>
                                             <?php else: ?>
-                                                <form
-                                                    method="POST"
-                                                    action="kategori_pelanggaran.php"
-                                                    onsubmit="return confirm('Yakin mau hapus kategori ini secara permanen dari database?')"
-                                                >
-                                                    <input
-                                                        type="hidden"
-                                                        name="id"
-                                                        value="<?= (int) $data['id']; ?>"
-                                                    >
-
-                                                    <button
-                                                        type="submit"
-                                                        name="hapus_permanen"
-                                                        class="btn-delete-perm"
-                                                    >
-                                                        Hapus
-                                                    </button>
+                                                <form method="POST" action="kategori_pelanggaran.php" onsubmit="return confirm('Yakin mau hapus kategori ini secara permanen dari database?')">
+                                                    <input type="hidden" name="id" value="<?= (int) $data['id']; ?>">
+                                                    <button type="submit" name="hapus_permanen" class="btn-delete-perm">Hapus</button>
                                                 </form>
                                             <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
-
                         <?php else: ?>
                             <tr>
-                                <td colspan="5" class="empty-state">
-                                    Belum ada data kategori pelanggaran.
-                                </td>
+                                <td colspan="5" class="empty-state">Belum ada data kategori pelanggaran.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
+
+            <!-- NAVIGASI PAGINATION -->
+            <?php if ($total_halaman > 1): ?>
+                <div class="p-3">
+                    <nav>
+                        <ul class="pagination justify-content-end mb-0">
+                            <li class="page-item <?= ($halaman_aktif <= 1) ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="kategori_pelanggaran.php?page=<?= $halaman_aktif - 1; ?><?= $search !== '' ? '&search=' . urlencode($search) : ''; ?>">Previous</a>
+                            </li>
+
+                            <?php for ($i = 1; $i <= $total_halaman; $i++): ?>
+                                <li class="page-item <?= ($halaman_aktif == $i) ? 'active' : ''; ?>">
+                                    <a class="page-link" href="kategori_pelanggaran.php?page=<?= $i; ?><?= $search !== '' ? '&search=' . urlencode($search) : ''; ?>" style="<?= ($halaman_aktif == $i) ? 'background-color: var(--teal); border-color: var(--teal); color: white;' : 'color: var(--navy);'; ?>"><?= $i; ?></a>
+                                </li>
+                            <?php endfor; ?>
+
+                            <li class="page-item <?= ($halaman_aktif >= $total_halaman) ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="kategori_pelanggaran.php?page=<?= $halaman_aktif + 1; ?><?= $search !== '' ? '&search=' . urlencode($search) : ''; ?>">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
         </section>
 
     </div>
