@@ -24,7 +24,38 @@ $status = 'tercatat'; // Default status
 
 /*
 |--------------------------------------------------------------------------
-| Mengambil data pilihan dari database
+| ENDPOINT AJAX: AMBIL DATA KELAS & TAHUN AJARAN BERDASARKAN SISWA & TANGGAL
+|--------------------------------------------------------------------------
+*/
+if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_GET['tanggal'])) {
+    header('Content-Type: application/json');
+    $s_id = (int)$_GET['siswa_id'];
+    $tgl = trim($_GET['tanggal']);
+
+    // Cari penempatan kelas aktif siswa pada tanggal tersebut
+    $q_penempatan = mysqli_query($koneksi, "
+        SELECT kelas_id, tahun_ajaran_id 
+        FROM t_kelas_siswa 
+        WHERE siswa_id = '$s_id' AND status_aktif = 1 
+        AND tanggal_mulai <= '$tgl' AND (tanggal_selesai IS NULL OR tanggal_selesai = '0000-00-00' OR tanggal_selesai >= '$tgl')
+        ORDER BY id DESC LIMIT 1
+    ");
+
+    if ($row = mysqli_fetch_assoc($q_penempatan)) {
+        echo json_encode([
+            'status' => 'success',
+            'kelas_id' => $row['kelas_id'],
+            'tahun_ajaran_id' => $row['tahun_ajaran_id']
+        ]);
+    } else {
+        echo json_encode(['status' => 'not_found']);
+    }
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Mengambil data pilihan dari database untuk form
 |--------------------------------------------------------------------------
 */
 $query_tahun = mysqli_query($koneksi, "SELECT id, nama FROM t_tahun_ajaran WHERE status_aktif = 1 ORDER BY id DESC");
@@ -171,6 +202,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pencatatan Pelanggaran Siswa - SIPES</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Tom Select CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <style>
         :root {
             --navy: #101c35;
@@ -182,8 +215,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .main-content { margin-left: 16.666667%; padding: 30px; }
         .content-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .form-label { font-weight: 600; color: var(--navy); font-size: 14px; }
-        .form-control, .form-select { border-radius: 10px; border: 1px solid #cbd5e1; padding: 10px 14px; }
-        .form-control:focus, .form-select:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15); }
+        .form-control { border-radius: 10px; border: 1px solid #cbd5e1; padding: 10px 14px; }
+        .form-control:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15); }
+        
+        /* Penyesuaian Tom Select agar selaras dengan tema Navy-Teal */
+        .ts-control {
+            border-radius: 10px !important;
+            border: 1px solid #cbd5e1 !important;
+            padding: 10px 14px !important;
+            box-shadow: none !important;
+        }
+        .ts-wrapper.focus .ts-control {
+            border-color: var(--teal) !important;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+        }
+        .ts-dropdown {
+            border-radius: 10px !important;
+            margin-top: 5px !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        }
+
         @media (max-width: 767.98px) { .main-content { margin-left: 0; padding: 15px; } }
     </style>
 </head>
@@ -214,7 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="tahun_ajaran_id" class="form-label">Tahun Ajaran</label>
-                        <select name="tahun_ajaran_id" id="tahun_ajaran_id" class="form-select" required>
+                        <select name="tahun_ajaran_id" id="tahun_ajaran_id" class="form-select searchable-select" required>
                             <option value="">Pilih Tahun Ajaran</option>
                             <?php while ($tahun = mysqli_fetch_assoc($query_tahun)): ?>
                                 <option value="<?= (int) $tahun['id'] ?>" <?= (string) $tahun_ajaran_id === (string) $tahun['id'] ? 'selected' : '' ?>>
@@ -233,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="siswa_id" class="form-label">Siswa</label>
-                        <select name="siswa_id" id="siswa_id" class="form-select" required>
+                        <select name="siswa_id" id="siswa_id" class="form-select searchable-select" required>
                             <option value="">Pilih Siswa</option>
                             <?php while ($siswa = mysqli_fetch_assoc($query_siswa)): ?>
                                 <option value="<?= (int) $siswa['id'] ?>" <?= (string) $siswa_id === (string) $siswa['id'] ? 'selected' : '' ?>>
@@ -245,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <div class="col-md-6 mb-3">
                         <label for="kelas_id" class="form-label">Kelas</label>
-                        <select name="kelas_id" id="kelas_id" class="form-select" required>
+                        <select name="kelas_id" id="kelas_id" class="form-select searchable-select" required>
                             <option value="">Pilih Kelas</option>
                             <?php while ($kelas = mysqli_fetch_assoc($query_kelas)): ?>
                                 <option value="<?= (int) $kelas['id'] ?>" <?= (string) $kelas_id === (string) $kelas['id'] ? 'selected' : '' ?>>
@@ -253,13 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </option>
                             <?php endwhile; ?>
                         </select>
-                        <div class="form-text text-muted small mt-1">Kelas harus sesuai dengan penempatan siswa pada tahun ajaran & tanggal terkait.</div>
+                        <div class="form-text text-muted small mt-1" id="infoAutoFill">💡 <i>Tip: Pilih siswa, kelas dan tahun ajaran akan terisi otomatis sesuai data aktif siswa.</i></div>
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label for="pelanggaran_id" class="form-label">Jenis Pelanggaran & Poin</label>
-                    <select name="pelanggaran_id" id="pelanggaran_id" class="form-select" required>
+                    <select name="pelanggaran_id" id="pelanggaran_id" class="form-select searchable-select" required>
                         <option value="">Pilih Jenis Pelanggaran</option>
                         <?php while ($pelanggaran = mysqli_fetch_assoc($query_pelanggaran)): ?>
                             <option value="<?= (int) $pelanggaran['id'] ?>" <?= (string) $pelanggaran_id === (string) $pelanggaran['id'] ? 'selected' : '' ?>>
@@ -301,5 +353,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Tom Select JS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+        // Inisialisasi Tom Select
+        const tomSelectInstances = {};
+        document.querySelectorAll('.searchable-select').forEach((el) => {
+            tomSelectInstances[el.id] = new TomSelect(el, {
+                create: false,
+                sortField: {
+                    field: "text",
+                    direction: "asc"
+                }
+            });
+        });
+
+        // Fitur Auto-Fill Kelas & Tahun Ajaran berdasarkan Siswa & Tanggal
+        const siswaSelect = document.getElementById('siswa_id');
+        const tanggalInput = document.getElementById('tanggal');
+        const infoAutoFill = document.getElementById('infoAutoFill');
+
+        function fetchSiswaInfo() {
+            const siswaId = siswaSelect.value;
+            const tanggal = tanggalInput.value;
+
+            if (!siswaId || !tanggal) return;
+
+            fetch(`pelanggaran_siswa.php?ajax_get_siswa_info=1&siswa_id=${siswaId}&tanggal=${tanggal}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Set nilai ke Tom Select Kelas
+                        if (tomSelectInstances['kelas_id']) {
+                            tomSelectInstances['kelas_id'].setValue(data.kelas_id);
+                        }
+                        // Set nilai ke Tom Select Tahun Ajaran
+                        if (tomSelectInstances['tahun_ajaran_id']) {
+                            tomSelectInstances['tahun_ajaran_id'].setValue(data.tahun_ajaran_id);
+                        }
+                        infoAutoFill.innerHTML = "✅ <span class='text-success fw-bold'>Kelas dan Tahun Ajaran terisi otomatis sesuai data siswa!</span>";
+                    } else {
+                        infoAutoFill.innerHTML = "⚠️ <span class='text-danger'>Penempatan kelas untuk siswa ini tidak ditemukan pada tanggal tersebut.</span>";
+                    }
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+        if (siswaSelect) {
+            siswaSelect.addEventListener('change', fetchSiswaInfo);
+        }
+        if (tanggalInput) {
+            tanggalInput.addEventListener('change', fetchSiswaInfo);
+        }
+    });
+</script>
 </body>
 </html>

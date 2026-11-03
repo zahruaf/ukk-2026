@@ -25,7 +25,10 @@ if (isset($_POST['tambah'])) {
     $password = $_POST['password'] ?? '';
     $pesan_error = '';
 
-    if ($pilihan_user === 'baru') {
+    // Validasi NIP harus 18 digit angka
+    if (!preg_match('/^[0-9]{18}$/', $nip)) {
+        $pesan_error = 'NIP harus terdiri dari tepat 18 digit angka.';
+    } elseif ($pilihan_user === 'baru') {
         if ($password === '') {
             $pesan_error = 'Password wajib diisi untuk membuat akun login baru.';
         } else {
@@ -117,18 +120,22 @@ if (isset($_POST['edit'])) {
     $status_aktif = $_POST['status_aktif'];
     $user_id = $_POST['user_id'];
 
-    $sql = "UPDATE t_guru SET
-            nip = '$nip',
-            nama = '$nama',
-            email = '$email',
-            status_aktif = '$status_aktif',
-            user_id = '$user_id'
-            WHERE id = '$id'";
+    if (!preg_match('/^[0-9]{18}$/', $nip)) {
+        $pesan_error = 'NIP harus terdiri dari tepat 18 digit angka.';
+    } else {
+        $sql = "UPDATE t_guru SET
+                nip = '$nip',
+                nama = '$nama',
+                email = '$email',
+                status_aktif = '$status_aktif',
+                user_id = '$user_id'
+                WHERE id = '$id'";
 
-    mysqli_query($koneksi, $sql);
+        mysqli_query($koneksi, $sql);
 
-    header("Location: data_guru.php");
-    exit;
+        header("Location: data_guru.php");
+        exit;
+    }
 }
 
 // DATA UNTUK EDIT
@@ -434,7 +441,11 @@ $data_guru = mysqli_query(
                                     type="text"
                                     name="nip"
                                     class="form-control"
+                                    inputmode="numeric"
+                                    maxlength="18"
                                     value="<?php echo htmlspecialchars($data_edit['nip']); ?>"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 18)"
+                                    title="NIP harus tepat 18 digit angka."
                                     required
                                 >
                             </div>
@@ -476,7 +487,11 @@ $data_guru = mysqli_query(
                             <div class="col-12">
                                 <label class="form-label">Akun Pengguna</label>
                                 <select name="user_id" class="form-select" required>
-                                    <?php while ($user = mysqli_fetch_assoc($data_user)) { ?>
+                                    <?php 
+                                    // Reset pointer data_user jika sebelumnya sudah dipakai
+                                    mysqli_data_seek($data_user, 0);
+                                    while ($user = mysqli_fetch_assoc($data_user)) { 
+                                    ?>
                                         <option
                                             value="<?php echo htmlspecialchars($user['id']); ?>"
                                             <?php if ($data_edit['user_id'] == $user['id']) echo 'selected'; ?>
@@ -518,7 +533,11 @@ $data_guru = mysqli_query(
                                     type="text"
                                     name="nip"
                                     class="form-control"
-                                    placeholder="Masukkan NIP"
+                                    placeholder="Masukkan 18 digit NIP"
+                                    inputmode="numeric"
+                                    maxlength="18"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 18)"
+                                    title="NIP harus berupa angka dan tepat 18 digit."
                                     required
                                 >
                             </div>
@@ -559,7 +578,10 @@ $data_guru = mysqli_query(
                                     <option value="baru" selected>Buat akun login baru</option>
                                     <option value="">Pilih akun pengguna yang sudah ada</option>
 
-                                    <?php while ($user = mysqli_fetch_assoc($data_user)) { ?>
+                                    <?php 
+                                    mysqli_data_seek($data_user, 0);
+                                    while ($user = mysqli_fetch_assoc($data_user)) { 
+                                    ?>
                                         <option value="<?php echo htmlspecialchars($user['id']); ?>">
                                             <?php echo htmlspecialchars($user['name']); ?>
                                             - <?php echo htmlspecialchars($user['email']); ?>

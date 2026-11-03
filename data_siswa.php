@@ -412,40 +412,32 @@ $data_siswa = mysqli_query(
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">NIS</label>
-                               
                                 <input
                                     type="text"
                                     name="nis"
                                     class="form-control"
                                     inputmode="numeric"
-                                    pattern="[0-9]{8}"
-                                    minlength="8"
                                     maxlength="8"
                                     value="<?php echo htmlspecialchars($data_edit['nis']); ?>"
                                     oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8)"
                                     title="NIS harus tepat 8 digit angka."
                                     required
                                 >
-
                             </div>
 
                             <div class="col-md-6">
                                 <label class="form-label">NISN</label>
-                                
                                 <input
                                     type="text"
                                     name="nisn"
                                     class="form-control"
                                     inputmode="numeric"
-                                    pattern="[0-9]{10}"
-                                    minlength="10"
                                     maxlength="10"
                                     value="<?php echo htmlspecialchars($data_edit['nisn']); ?>"
                                     oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
                                     title="NISN harus tepat 10 digit angka."
                                     required
                                 >
-
                             </div>
 
                             <div class="col-md-6">
@@ -502,12 +494,12 @@ $data_siswa = mysqli_query(
                                     type="text"
                                     name="nis"
                                     class="form-control"
-                                    placeholder="Masukkan NIS"
+                                    placeholder="Masukkan 8 digit NIS"
                                     inputmode="numeric"
-                                    pattern="[0-9]{8,}"
-                                    minlength="8"
-                                    title="NIS harus berupa angka dan minimal 8 digit."
+                                    maxlength="8"
+                                    title="NIS harus berupa angka dan tepat 8 digit."
                                     value="<?php echo htmlspecialchars($_POST['nis'] ?? ''); ?>"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8)"
                                     required
                                 >
                             </div>
@@ -518,12 +510,12 @@ $data_siswa = mysqli_query(
                                     type="text"
                                     name="nisn"
                                     class="form-control"
-                                    placeholder="Masukkan NISN"
+                                    placeholder="Masukkan 10 digit NISN"
                                     inputmode="numeric"
-                                    pattern="[0-9]{10,}"
-                                    minlength="10"
-                                    title="NISN harus berupa angka dan minimal 10 digit."
+                                    maxlength="10"
+                                    title="NISN harus berupa angka dan tepat 10 digit."
                                     value="<?php echo htmlspecialchars($_POST['nisn'] ?? ''); ?>"
+                                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
                                     required
                                 >
                             </div>
