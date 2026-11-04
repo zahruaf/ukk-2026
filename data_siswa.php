@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -123,17 +124,25 @@ $mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
 
 // Tangkap keyword pencarian
 $cari = trim($_GET['cari'] ?? '');
-$where_sql = "";
+
+// Tampilkan hanya siswa aktif
+$where_sql = "WHERE status_aktif = 1";
 
 if ($cari !== '') {
     $cari_esc = mysqli_real_escape_string($koneksi, $cari);
-    $where_sql = "WHERE nis LIKE '%$cari_esc%' OR nisn LIKE '%$cari_esc%' OR nama LIKE '%$cari_esc%' OR alamat LIKE '%$cari_esc%'";
+
+    $where_sql .= " AND (
+        nis LIKE '%$cari_esc%'
+        OR nisn LIKE '%$cari_esc%'
+        OR nama LIKE '%$cari_esc%'
+        OR alamat LIKE '%$cari_esc%'
+    )";
 }
 
 // Hitung total data sesuai pencarian untuk pagination
 $query_jml = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_siswa $where_sql");
 $row_jml = mysqli_fetch_assoc($query_jml);
-analytics:
+
 $total_data = $row_jml['total'];
 $total_halaman = ceil($total_data / $batas);
 
@@ -369,9 +378,9 @@ $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY 
                                             </div>
                                         </td>
                                     </tr>
-                            <?php 
+                            <?php
                                 }
-                            } else { 
+                            } else {
                             ?>
                                 <tr>
                                     <td colspan="9" class="empty-state">Data siswa tidak ditemukan.</td>
