@@ -1,10 +1,28 @@
 <?php
 $role = $_SESSION['role'] ?? '';
+$email_user = $_SESSION['email'] ?? '';
+
+// Cek apakah guru yang login adalah wali kelas aktif
+$is_wali_kelas = false;
+if ($role != 'admin' && !empty($email_user)) {
+    $q_cek_sidebar = mysqli_query($koneksi, "
+        SELECT tw.id 
+        FROM t_wali_kelas tw
+        JOIN t_guru g ON tw.guru_id = g.id
+        JOIN t_kelas k ON tw.kelas_id = k.id
+        WHERE g.email = '$email_user' AND k.status_aktif = 1
+    ");
+    if ($q_cek_sidebar && mysqli_num_rows($q_cek_sidebar) > 0) {
+        $is_wali_kelas = true;
+    }
+}
 ?>
 
 <aside class="col-md-3 col-lg-2 p-3 position-fixed top-0 start-0 overflow-auto sidebar-app">
     <div class="sidebar-brand mb-4">
-        <div class="brand-mark">SP</div>
+        <div class="brand-mark">
+            <i class="fas fa-shield-alt"></i>
+        </div>
         <div>
             <h5 class="mb-0">SIPES</h5>
             <small>Sistem Pelanggaran Siswa</small>
@@ -19,17 +37,28 @@ $role = $_SESSION['role'] ?? '';
         <li class="nav-item">
             <a href="dashboard.php"
                class="nav-link <?= ($halaman == 'dashboard') ? 'active' : '' ?>">
-                <span class="menu-mark">D</span>
+                <span class="menu-mark"><i class="fas fa-home"></i></span>
                 Dashboard
             </a>
         </li>
+
+        <!-- MENU WALI KELAS (MUNCUL OTOMATIS KHUSUS WALI KELAS) -->
+        <?php if ($is_wali_kelas): ?>
+            <li class="nav-item">
+                <a href="rekap_wali_kelas.php"
+                   class="nav-link <?= ($halaman == 'rekap_wali_kelas') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-id-card-alt"></i></span>
+                    Rekap Wali Kelas
+                </a>
+            </li>
+        <?php endif; ?>
 
         <?php if ($role == 'admin'): ?>
             <!-- ================= MENU KHUSUS ADMIN (MASTER DATA) ================= -->
             <li class="nav-item">
                 <a href="data_siswa.php"
                    class="nav-link <?= ($halaman == 'siswa') ? 'active' : '' ?>">
-                    <span class="menu-mark">S</span>
+                    <span class="menu-mark"><i class="fas fa-user-graduate"></i></span>
                     Data Siswa
                 </a>
             </li>
@@ -37,7 +66,7 @@ $role = $_SESSION['role'] ?? '';
             <li class="nav-item">
                 <a href="data_guru.php"
                    class="nav-link <?= ($halaman == 'guru') ? 'active' : '' ?>">
-                    <span class="menu-mark">G</span>
+                    <span class="menu-mark"><i class="fas fa-chalkboard-teacher"></i></span>
                     Data Guru
                 </a>
             </li>
@@ -45,41 +74,51 @@ $role = $_SESSION['role'] ?? '';
             <li class="nav-item">
                 <a href="kelas.php"
                    class="nav-link <?= ($halaman == 'kelas') ? 'active' : '' ?>">
-                    <span class="menu-mark">K</span>
+                    <span class="menu-mark"><i class="fas fa-door-open"></i></span>
                     Kelas
                 </a>
             </li>
 
-            <!-- MENU TAMBAHAN: WALI KELAS -->
+            <!-- MENU WALI KELAS (ADMIN) -->
             <li class="nav-item">
                 <a href="wali_kelas.php"
                    class="nav-link <?= ($halaman == 'wali_kelas') ? 'active' : '' ?>">
-                    <span class="menu-mark">W</span>
+                    <span class="menu-mark"><i class="fas fa-user-tie"></i></span>
                     Wali Kelas
+                </a>
+            </li>
+
+            <!-- MENU PENEMPATAN SISWA (BARU) -->
+            <li class="nav-item">
+                <a href="penempatan_siswa.php"
+                   class="nav-link <?= ($halaman == 'penempatan_siswa') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-exchange-alt"></i></span>
+                    Penempatan Siswa
                 </a>
             </li>
 
             <li class="nav-item">
                 <a href="tahun_ajaran.php"
                    class="nav-link <?= ($halaman == 'tahun_ajaran') ? 'active' : '' ?>">
-                    <span class="menu-mark">T</span>
+                    <span class="menu-mark"><i class="fas fa-calendar-alt"></i></span>
                     Tahun Ajaran
+                </a>
+            </li>
+
+            <!-- KATEGORI PELANGGARAN -->
+            <li class="nav-item">
+                <a href="kategori_pelanggaran.php"
+                   class="nav-link <?= ($halaman == 'kategori_pelanggaran') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-tags"></i></span>
+                    Kategori Pelanggaran
                 </a>
             </li>
 
             <li class="nav-item">
                 <a href="jenis_pelanggaran.php"
                    class="nav-link <?= ($halaman == 'jenis_pelanggaran') ? 'active' : '' ?>">
-                    <span class="menu-mark">J</span>
+                    <span class="menu-mark"><i class="fas fa-exclamation-triangle"></i></span>
                     Jenis Pelanggaran
-                </a>
-            </li>
-
-            <li class="nav-item">
-                <a href="kategori_pelanggaran.php"
-                   class="nav-link <?= ($halaman == 'kategori_pelanggaran') ? 'active' : '' ?>">
-                    <span class="menu-mark">K</span>
-                    Kategori Pelanggaran
                 </a>
             </li>
         <?php endif; ?>
@@ -89,37 +128,37 @@ $role = $_SESSION['role'] ?? '';
             <li class="nav-item">
                 <a href="tindakan.php"
                    class="nav-link <?= ($halaman == 'tindakan') ? 'active' : '' ?>">
-                    <span class="menu-mark">T</span>
+                    <span class="menu-mark"><i class="fas fa-gavel"></i></span>
                     Tindakan
                 </a>
             </li>
         <?php endif; ?>
 
-            <?php if ($role != 'admin'): ?>
+        <?php if ($role != 'admin'): ?>
          <li class="nav-item">
             <a href="pelanggaran_siswa.php"
                class="nav-link <?= ($halaman == 'pelanggaran_siswa') ? 'active' : '' ?>">
-                <span class="menu-mark">P</span>
+                <span class="menu-mark"><i class="fas fa-clipboard-list"></i></span>
                 Pencatatan Pelanggaran
             </a>
         </li>
         <?php endif; ?>
 
         <?php if ($role != 'admin'): ?>
-    <li class="nav-item">
-        <a href="rekap_poin.php"
-           class="nav-link <?= ($halaman == 'rekap_poin') ? 'active' : '' ?>">
-            <span class="menu-mark">R</span>
-            Riwayat & Rekap Poin
-        </a>
-    </li>
-<?php endif; ?>
+        <li class="nav-item">
+            <a href="rekap_poin.php"
+               class="nav-link <?= ($halaman == 'rekap_poin') ? 'active' : '' ?>">
+                <span class="menu-mark"><i class="fas fa-chart-line"></i></span>
+                Riwayat & Rekap Poin
+            </a>
+        </li>
+        <?php endif; ?>
 
         <!-- ================= MENU BERSAMA (ADMIN & GURU) ================= -->
         <li class="nav-item">
             <a href="laporan.php"
                class="nav-link <?= ($halaman == 'laporan') ? 'active' : '' ?>">
-                <span class="menu-mark">L</span>
+                <span class="menu-mark"><i class="fas fa-file-alt"></i></span>
                 Laporan
             </a>
         </li>
@@ -128,7 +167,7 @@ $role = $_SESSION['role'] ?? '';
             <li class="nav-item">
                 <a href="about.php"
                    class="nav-link <?= ($halaman == 'about') ? 'active' : '' ?>">
-                    <span class="menu-mark">A</span>
+                    <span class="menu-mark"><i class="fas fa-info-circle"></i></span>
                     About
                 </a>
             </li>
@@ -151,7 +190,7 @@ $role = $_SESSION['role'] ?? '';
         </div>
 
         <a href="logout.php" class="logout-link">
-            Keluar dari aplikasi
+            <i class="fas fa-sign-out-alt me-1"></i> Keluar dari aplikasi
         </a>
     </div>
 </aside>
@@ -217,6 +256,7 @@ $role = $_SESSION['role'] ?? '';
         border-radius: 9px;
         color: #c5d0e0;
         font-size: 13px;
+        font-weight: 500;
         transition: background-color 0.2s, color 0.2s;
     }
 
@@ -228,7 +268,7 @@ $role = $_SESSION['role'] ?? '';
     .sidebar-app .nav-link.active {
         background: #14b8a6;
         color: #10243b;
-        font-weight: 700;
+        font-weight: 500;
     }
 
     .menu-mark {
@@ -241,11 +281,12 @@ $role = $_SESSION['role'] ?? '';
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.09);
         font-size: 12px;
-        font-weight: 700;
+        color: #c5d0e0;
     }
 
-    .nav-link.active .menu-mark {
-        background: rgba(16, 36, 59, 0.12);
+    .sidebar-app .nav-link.active .menu-mark {
+        background: rgba(16, 36, 59, 0.15) !important;
+        color: #10243b !important;
     }
 
     .sidebar-footer {

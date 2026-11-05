@@ -22,12 +22,15 @@ if (isset($_POST['tambah'])) {
     $email = trim($_POST['email']);
     $status_aktif = $_POST['status_aktif'];
     $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
 
     // Validasi NIP harus tepat 18 digit angka
     if (!preg_match('/^[0-9]{18}$/', $nip)) {
         $pesan_error = 'NIP harus terdiri dari tepat 18 digit angka.';
     } elseif (empty($password)) {
         $pesan_error = 'Password login wajib diisi.';
+    } elseif ($password !== $confirm_password) {
+        $pesan_error = 'Konfirmasi password tidak cocok dengan password.';
     } else {
         // Cek apakah email sudah terdaftar di t_users
         $cek_email = mysqli_prepare($koneksi, "SELECT id FROM t_users WHERE email = ?");
@@ -88,7 +91,6 @@ if (isset($_GET['nonaktifkan'])) {
 // HAPUS PERMANEN DATA GURU (HARD DELETE)
 if (isset($_GET['hapus_permanen'])) {
     $id = (int)$_GET['hapus_permanen'];
-    // Opsional: Hapus juga data user terkait jika diperlukan, atau biarkan gurunya saja
     mysqli_query($koneksi, "DELETE FROM t_guru WHERE id = '$id'");
     header("Location: data_guru.php");
     exit;
@@ -166,6 +168,7 @@ $data_guru = mysqli_query($koneksi, "SELECT * FROM t_guru $where_sql ORDER BY id
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Guru - SIPES</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --navy: #101c35;
@@ -283,6 +286,11 @@ $data_guru = mysqli_query($koneksi, "SELECT * FROM t_guru $where_sql ORDER BY id
                                 <input type="password" name="password" class="form-control" placeholder="Buat password untuk login" autocomplete="new-password" required>
                                 <small class="text-secondary">Password digunakan guru untuk masuk ke sistem.</small>
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Konfirmasi Password</label>
+                                <input type="password" name="confirm_password" class="form-control" placeholder="Ulangi password yang sama" autocomplete="new-password" required>
+                                <small class="text-secondary">Masukkan ulang password untuk konfirmasi.</small>
+                            </div>
                             <div class="col-12">
                                 <button type="submit" name="tambah" class="btn btn-teal">Tambah Guru</button>
                             </div>
@@ -322,7 +330,6 @@ $data_guru = mysqli_query($koneksi, "SELECT * FROM t_guru $where_sql ORDER BY id
                                 <th>Nama Guru</th>
                                 <th>Email</th>
                                 <th>Status</th>
-                                <th>User ID</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -344,7 +351,6 @@ $data_guru = mysqli_query($koneksi, "SELECT * FROM t_guru $where_sql ORDER BY id
                                                 <span class="status-badge status-inactive">Tidak Aktif</span>
                                             <?php } ?>
                                         </td>
-                                        <td><?php echo htmlspecialchars($guru['user_id']); ?></td>
                                         <td>
                                             <div class="d-flex gap-2">
                                                 <a href="data_guru.php?edit=<?php echo $guru['id']; ?>" class="action-link action-edit">Edit</a>
@@ -361,7 +367,7 @@ $data_guru = mysqli_query($koneksi, "SELECT * FROM t_guru $where_sql ORDER BY id
                             } else { 
                             ?>
                                 <tr>
-                                    <td colspan="7" class="empty-state">Data guru tidak ditemukan.</td>
+                                    <td colspan="6" class="empty-state">Data guru tidak ditemukan.</td>
                                 </tr>
                             <?php } ?>
                         </tbody>

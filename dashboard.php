@@ -12,11 +12,29 @@ $halaman = 'dashboard';
 
 $nama_pengguna = htmlspecialchars($_SESSION['name'] ?? 'Pengguna');
 $role_pengguna = $_SESSION['role'] ?? '';
+$email_login = $_SESSION['email'] ?? '';
 
 if ($role_pengguna == 'admin') {
     $label_role = 'Admin';
 } else {
-    $label_role = 'Guru';
+    $label_role = 'Guru / Petugas';
+}
+
+// CEK APAKAH GURU INI ADALAH WALI KELAS (BERDASARKAN TABEL t_wali_kelas)
+$nama_kelas_wali = '';
+if ($role_pengguna != 'admin') {
+    $query_wali = mysqli_query($koneksi, "
+        SELECT k.nama AS nama_kelas 
+        FROM t_wali_kelas tw
+        JOIN t_guru g ON tw.guru_id = g.id
+        JOIN t_kelas k ON tw.kelas_id = k.id
+        WHERE g.email = '$email_login' AND k.status_aktif = 1
+    ");
+    
+    if ($query_wali && mysqli_num_rows($query_wali) > 0) {
+        $data_wali = mysqli_fetch_assoc($query_wali);
+        $nama_kelas_wali = $data_wali['nama_kelas'];
+    }
 }
 
 // MENGAMBIL TOTAL DATA UNTUK KARTU STATISTIK
@@ -47,8 +65,11 @@ $q_terbaru = mysqli_query($koneksi, "
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - SIPES</title>
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
         :root {
@@ -143,46 +164,53 @@ $q_terbaru = mysqli_query($koneksi, "
         .stat-card {
             height: 100%;
             border: 1px solid #e8edf4;
-            border-radius: 15px;
+            border-radius: 16px;
             background: #ffffff;
             box-shadow: 0 5px 20px rgba(16, 28, 53, 0.04);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 24px rgba(16, 28, 53, 0.08);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(16, 28, 53, 0.09);
         }
+
+        .stat-card-siswa { border-left: 5px solid #10b981 !important; }
+        .stat-card-guru { border-left: 5px solid #06b6d4 !important; }
+        .stat-card-kelas { border-left: 5px solid #8b5cf6 !important; }
 
         .stat-card .card-body {
-            padding: 23px;
+            padding: 24px;
         }
 
-        .stat-label {
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 13px;
-        }
-
-        .stat-number {
-            color: var(--navy);
-            font-size: 34px;
-            font-weight: 800;
-            margin-bottom: 18px;
-        }
-
-        .stat-symbol {
-            width: 42px;
-            height: 42px;
+        .stat-icon {
+            width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 12px;
-            background: #d9f7f2;
-            color: #0f766e;
+            font-size: 20px;
+        }
+
+        .icon-siswa { background-color: #e6f4ea; color: #10b981; }
+        .icon-guru { background-color: #e0f2fe; color: #06b6d4; }
+        .icon-kelas { background-color: #f3e8ff; color: #8b5cf6; }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .stat-number {
+            color: var(--navy);
+            font-size: 36px;
             font-weight: 800;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
+            margin-top: 4px;
         }
 
         .btn-teal {
@@ -191,10 +219,11 @@ $q_terbaru = mysqli_query($koneksi, "
             color: #10243b;
             border: none;
             border-radius: 8px;
-            padding: 9px 16px;
+            padding: 8px 16px;
             font-size: 12px;
             font-weight: 750;
             text-decoration: none;
+            transition: background 0.2s, color 0.2s;
         }
 
         .btn-teal:hover {
@@ -231,11 +260,11 @@ $q_terbaru = mysqli_query($koneksi, "
             }
 
             .stat-card .card-body {
-                padding: 16px;
+                padding: 18px;
             }
 
             .stat-number {
-                font-size: 28px;
+                font-size: 30px;
             }
         }
     </style>
@@ -260,6 +289,9 @@ $q_terbaru = mysqli_query($koneksi, "
 
                 <span class="role-badge">
                     <?= htmlspecialchars($label_role) ?>
+                    <?php if (!empty($nama_kelas_wali)): ?>
+                        | Wali Kelas <?= htmlspecialchars($nama_kelas_wali) ?>
+                    <?php endif; ?>
                 </span>
             </div>
 
@@ -267,6 +299,9 @@ $q_terbaru = mysqli_query($koneksi, "
                 <h3>Selamat datang, <?= $nama_pengguna ?>!</h3>
                 <p>
                     Anda login sebagai <?= htmlspecialchars($label_role) ?>.
+                    <?php if (!empty($nama_kelas_wali)): ?>
+                        Anda bertindak sebagai Wali Kelas untuk kelas <strong><?= htmlspecialchars($nama_kelas_wali) ?></strong>.
+                    <?php endif; ?>
                     Selamat menggunakan sistem informasi pelanggaran siswa.
                 </p>
             </section>
@@ -275,63 +310,70 @@ $q_terbaru = mysqli_query($koneksi, "
 
             <div class="row mb-4">
 
+                <!-- CARD DATA SISWA -->
                 <div class="col-md-4 mb-3">
-                    <div class="card stat-card">
+                    <div class="card stat-card stat-card-siswa">
                         <div class="card-body">
-                            <div class="stat-symbol">S</div>
-
-                            <div class="stat-label">Data Siswa</div>
-
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="stat-label">Data Siswa</span>
+                                <div class="stat-icon icon-siswa">
+                                    <i class="fas fa-user-graduate"></i>
+                                </div>
+                            </div>
                             <h2 class="stat-number"><?= $total_siswa; ?></h2>
-
-                            <a href="data_siswa.php" class="btn-teal">
-                                LIHAT DATA
-                            </a>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-muted"><i class="fas fa-check-circle text-success me-1"></i> Terdaftar aktif</small>
+                                <a href="data_siswa.php" class="btn-teal">LIHAT DATA</a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- CARD DATA GURU -->
                 <div class="col-md-4 mb-3">
-                    <div class="card stat-card">
+                    <div class="card stat-card stat-card-guru">
                         <div class="card-body">
-                            <div class="stat-symbol">G</div>
-
-                            <div class="stat-label">Data Guru</div>
-
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="stat-label">Data Guru</span>
+                                <div class="stat-icon icon-guru">
+                                    <i class="fas fa-chalkboard-teacher"></i>
+                                </div>
+                            </div>
                             <h2 class="stat-number"><?= $total_guru; ?></h2>
-
-                            <?php if ($role_pengguna == 'admin') { ?>
-                                <a href="data_guru.php" class="btn-teal">
-                                    LIHAT DATA
-                                </a>
-                            <?php } else { ?>
-                                <span class="text-secondary small">
-                                    Ringkasan data
-                                </span>
-                            <?php } ?>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <?php if ($role_pengguna == 'admin') { ?>
+                                    <small class="text-muted"><i class="fas fa-user-check text-info me-1"></i> Pengajar aktif</small>
+                                    <a href="data_guru.php" class="btn-teal">LIHAT DATA</a>
+                                <?php } else { ?>
+                                    <span class="text-secondary small">Ringkasan data</span>
+                                <?php } ?>
+                            </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- CARD DATA KELAS -->
                 <div class="col-md-4 mb-3">
-                    <div class="card stat-card">
+                    <div class="card stat-card stat-card-kelas">
                         <div class="card-body">
-                            <div class="stat-symbol">K</div>
-
-                            <div class="stat-label">Kelas</div>
-
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="stat-label">Data Kelas</span>
+                                <div class="stat-icon icon-kelas">
+                                    <i class="fas fa-door-open"></i>
+                                </div>
+                            </div>
                             <h2 class="stat-number"><?= $total_kelas; ?></h2>
-
-                            <a href="kelas.php" class="btn-teal">
-                                LIHAT DATA
-                            </a>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-muted"><i class="fas fa-school text-primary me-1"></i> Ruang & Jurusan</small>
+                                <a href="kelas.php" class="btn-teal">LIHAT DATA</a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            <!-- TAMBAHAN BAGIAN BAWAH: TABEL PELANGGARAN TERBARU BIAR TIDAK KOSONG -->
+            <!-- TABEL PELANGGARAN TERBARU -->
             <div class="content-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="section-title m-0">Aktivitas / Pelanggaran Terbaru</h5>
