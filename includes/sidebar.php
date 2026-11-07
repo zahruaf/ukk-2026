@@ -1,24 +1,41 @@
+
 <?php
 $role = $_SESSION['role'] ?? '';
 $email_user = $_SESSION['email'] ?? '';
 
-// Cek apakah guru yang login adalah wali kelas aktif
+$is_admin = ($role === 'admin');
+$is_guru = ($role === 'petugas');
+
+// Cek apakah guru yang login merupakan wali kelas aktif
 $is_wali_kelas = false;
-if ($role != 'admin' && !empty($email_user)) {
-    $q_cek_sidebar = mysqli_query($koneksi, "
-        SELECT tw.id 
+
+if ($is_guru && !empty($email_user)) {
+    $stmt_cek_sidebar = mysqli_prepare($koneksi, "
+        SELECT tw.id
         FROM t_wali_kelas tw
         JOIN t_guru g ON tw.guru_id = g.id
         JOIN t_kelas k ON tw.kelas_id = k.id
-        WHERE g.email = '$email_user' AND k.status_aktif = 1
+        WHERE g.email = ? AND k.status_aktif = 1
+        LIMIT 1
     ");
-    if ($q_cek_sidebar && mysqli_num_rows($q_cek_sidebar) > 0) {
-        $is_wali_kelas = true;
+
+    if ($stmt_cek_sidebar) {
+        mysqli_stmt_bind_param($stmt_cek_sidebar, "s", $email_user);
+        mysqli_stmt_execute($stmt_cek_sidebar);
+
+        $hasil_cek_sidebar = mysqli_stmt_get_result($stmt_cek_sidebar);
+
+        if ($hasil_cek_sidebar && mysqli_num_rows($hasil_cek_sidebar) > 0) {
+            $is_wali_kelas = true;
+        }
+
+        mysqli_stmt_close($stmt_cek_sidebar);
     }
 }
 ?>
 
 <aside class="col-md-3 col-lg-2 p-3 position-fixed top-0 start-0 overflow-auto sidebar-app">
+
     <div class="sidebar-brand mb-4">
         <div class="brand-mark">
             <i class="fas fa-shield-alt"></i>
@@ -33,7 +50,7 @@ if ($role != 'admin' && !empty($email_user)) {
 
     <ul class="nav nav-pills flex-column gap-1">
 
-        <!-- DASHBOARD (SEMUA ROLE) -->
+        <!-- DASHBOARD SEMUA ROLE -->
         <li class="nav-item">
             <a href="dashboard.php"
                class="nav-link <?= ($halaman == 'dashboard') ? 'active' : '' ?>">
@@ -42,19 +59,9 @@ if ($role != 'admin' && !empty($email_user)) {
             </a>
         </li>
 
-        <!-- MENU WALI KELAS (MUNCUL OTOMATIS KHUSUS WALI KELAS) -->
-        <?php if ($is_wali_kelas): ?>
-            <li class="nav-item">
-                <a href="rekap_wali_kelas.php"
-                   class="nav-link <?= ($halaman == 'rekap_wali_kelas') ? 'active' : '' ?>">
-                    <span class="menu-mark"><i class="fas fa-id-card-alt"></i></span>
-                    Rekap Wali Kelas
-                </a>
-            </li>
-        <?php endif; ?>
+        <!-- MENU ADMIN -->
+        <?php if ($is_admin): ?>
 
-        <?php if ($role == 'admin'): ?>
-            <!-- ================= MENU KHUSUS ADMIN (MASTER DATA) ================= -->
             <li class="nav-item">
                 <a href="data_siswa.php"
                    class="nav-link <?= ($halaman == 'siswa') ? 'active' : '' ?>">
@@ -79,7 +86,6 @@ if ($role != 'admin' && !empty($email_user)) {
                 </a>
             </li>
 
-            <!-- MENU WALI KELAS (ADMIN) -->
             <li class="nav-item">
                 <a href="wali_kelas.php"
                    class="nav-link <?= ($halaman == 'wali_kelas') ? 'active' : '' ?>">
@@ -88,7 +94,6 @@ if ($role != 'admin' && !empty($email_user)) {
                 </a>
             </li>
 
-            <!-- MENU PENEMPATAN SISWA (BARU) -->
             <li class="nav-item">
                 <a href="penempatan_siswa.php"
                    class="nav-link <?= ($halaman == 'penempatan_siswa') ? 'active' : '' ?>">
@@ -105,7 +110,6 @@ if ($role != 'admin' && !empty($email_user)) {
                 </a>
             </li>
 
-            <!-- KATEGORI PELANGGARAN -->
             <li class="nav-item">
                 <a href="kategori_pelanggaran.php"
                    class="nav-link <?= ($halaman == 'kategori_pelanggaran') ? 'active' : '' ?>">
@@ -121,10 +125,20 @@ if ($role != 'admin' && !empty($email_user)) {
                     Jenis Pelanggaran
                 </a>
             </li>
+
         <?php endif; ?>
 
-        <!-- ================= MENU KHUSUS GURU / PETUGAS (OPERASIONAL) ================= -->
-        <?php if ($role != 'admin'): ?>
+        <!-- MENU GURU -->
+        <?php if ($is_guru): ?>
+
+            <li class="nav-item">
+                <a href="pelanggaran_siswa.php"
+                   class="nav-link <?= ($halaman == 'pelanggaran_siswa') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-clipboard-list"></i></span>
+                    Pencatatan Pelanggaran
+                </a>
+            </li>
+
             <li class="nav-item">
                 <a href="tindakan.php"
                    class="nav-link <?= ($halaman == 'tindakan') ? 'active' : '' ?>">
@@ -132,29 +146,36 @@ if ($role != 'admin' && !empty($email_user)) {
                     Tindakan
                 </a>
             </li>
+
         <?php endif; ?>
 
-        <?php if ($role != 'admin'): ?>
-         <li class="nav-item">
-            <a href="pelanggaran_siswa.php"
-               class="nav-link <?= ($halaman == 'pelanggaran_siswa') ? 'active' : '' ?>">
-                <span class="menu-mark"><i class="fas fa-clipboard-list"></i></span>
-                Pencatatan Pelanggaran
-            </a>
-        </li>
+        <!-- MENU WALI KELAS -->
+        <?php if ($is_wali_kelas): ?>
+
+            <li class="nav-item">
+                <a href="rekap_wali_kelas.php"
+                   class="nav-link <?= ($halaman == 'rekap_wali_kelas') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-id-card-alt"></i></span>
+                    Rekap Wali Kelas
+                </a>
+            </li>
+
         <?php endif; ?>
 
-        <?php if ($role != 'admin'): ?>
-        <li class="nav-item">
-            <a href="rekap_poin.php"
-               class="nav-link <?= ($halaman == 'rekap_poin') ? 'active' : '' ?>">
-                <span class="menu-mark"><i class="fas fa-chart-line"></i></span>
-                Riwayat & Rekap Poin
-            </a>
-        </li>
+        <!-- MENU RIWAYAT -->
+        <?php if ($is_guru || $is_wali_kelas): ?>
+
+            <li class="nav-item">
+                <a href="rekap_poin.php"
+                   class="nav-link <?= ($halaman == 'rekap_poin') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-chart-line"></i></span>
+                    Riwayat & Rekap Poin
+                </a>
+            </li>
+
         <?php endif; ?>
 
-        <!-- ================= MENU BERSAMA (ADMIN & GURU) ================= -->
+        <!-- MENU LAPORAN SEMUA ROLE -->
         <li class="nav-item">
             <a href="laporan.php"
                class="nav-link <?= ($halaman == 'laporan') ? 'active' : '' ?>">
@@ -163,7 +184,9 @@ if ($role != 'admin' && !empty($email_user)) {
             </a>
         </li>
 
-        <?php if ($role == 'admin'): ?>
+        <!-- ABOUT ADMIN -->
+        <?php if ($is_admin): ?>
+
             <li class="nav-item">
                 <a href="about.php"
                    class="nav-link <?= ($halaman == 'about') ? 'active' : '' ?>">
@@ -171,12 +194,14 @@ if ($role != 'admin' && !empty($email_user)) {
                     About
                 </a>
             </li>
+
         <?php endif; ?>
 
     </ul>
 
     <div class="sidebar-footer">
         <div class="sidebar-user">
+
             <div class="user-avatar">
                 <?= strtoupper(substr($_SESSION['name'] ?? 'U', 0, 1)) ?>
             </div>
@@ -185,14 +210,28 @@ if ($role != 'admin' && !empty($email_user)) {
                 <div class="user-name">
                     <?= htmlspecialchars($_SESSION['name'] ?? 'Pengguna') ?>
                 </div>
-                <small><?= $role == 'admin' ? 'Administrator' : 'Petugas / Guru' ?></small>
+
+                <small>
+                    <?php
+                    if ($is_admin) {
+                        echo 'Administrator';
+                    } elseif ($is_wali_kelas) {
+                        echo 'Guru / Wali Kelas';
+                    } else {
+                        echo 'Guru / Petugas';
+                    }
+                    ?>
+                </small>
             </div>
+
         </div>
 
         <a href="logout.php" class="logout-link">
-            <i class="fas fa-sign-out-alt me-1"></i> Keluar dari aplikasi
+            <i class="fas fa-sign-out-alt me-1"></i>
+            Keluar dari aplikasi
         </a>
     </div>
+
 </aside>
 
 <style>
