@@ -13,7 +13,13 @@ $halaman = 'rekap_wali_kelas';
 $email_login = $_SESSION['email'] ?? '';
 $role_pengguna = $_SESSION['role'] ?? '';
 
-// 1. CARI KELAS PERWALIAN DARI GURU YANG SEDANG LOGIN
+// 1. BATASI AKSES KHUSUS GURU / PETUGAS
+if ($role_pengguna !== 'petugas') {
+    header("Location: dashboard.php");
+    exit;
+}
+
+// 2. CARI KELAS PERWALIAN DARI GURU YANG SEDANG LOGIN
 $kelas_id_wali = 0;
 $nama_kelas_wali = '';
 
@@ -42,7 +48,13 @@ if ($stmt_cek_wali) {
     mysqli_stmt_close($stmt_cek_wali);
 }
 
-// 2. AMBIL DATA SISWA MELALUI TABEL PENEMPATAN SISWA
+// 3. TOLAK AKSES JIKA BUKAN WALI KELAS AKTIF
+if ($kelas_id_wali <= 0) {
+    header("Location: dashboard.php");
+    exit;
+}
+
+// 4. AMBIL DATA SISWA MELALUI TABEL PENEMPATAN SISWA
 $data_siswa_rekap = [];
 
 if ($kelas_id_wali > 0) {

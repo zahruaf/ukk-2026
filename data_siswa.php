@@ -1,9 +1,16 @@
-
 <?php
 session_start();
 
 if (!isset($_SESSION['login'])) {
     header("Location: login.php");
+    exit;
+}
+
+// PEMBATASAN HAK AKSES ADMIN
+$role = $_SESSION['role'] ?? '';
+
+if ($role !== 'admin') {
+    header("Location: dashboard.php");
     exit;
 }
 

@@ -21,8 +21,6 @@ $pesan_sukses = '';
 $pesan_error = '';
 
 // AMBIL DATA TAHUN AJARAN AKTIF
-// GROUP BY digunakan agar data tahun ajaran duplikat
-// tidak tampil berulang pada pilihan.
 $data_tahun = [];
 
 $q_tahun = mysqli_query($koneksi, "
@@ -161,11 +159,9 @@ if (isset($_POST['simpan_penempatan'])) {
                 $penempatan_lama &&
                 intval($penempatan_lama['kelas_id']) == $kelas_id
             ) {
-
                 throw new Exception(
                     "Siswa sudah berada di kelas tersebut."
                 );
-
             }
 
             // JIKA SUDAH ADA PENEMPATAN, TUTUP RIWAYAT LAMA
@@ -195,7 +191,6 @@ if (isset($_POST['simpan_penempatan'])) {
                 if (!$update_lama) {
                     throw new Exception(mysqli_error($koneksi));
                 }
-
             }
 
             // SIMPAN PENEMPATAN BARU
@@ -242,7 +237,6 @@ if (isset($_POST['simpan_penempatan'])) {
             $pesan_error = $e->getMessage();
 
         }
-
     }
 }
 
@@ -325,7 +319,6 @@ if ($tahun_terpilih) {
     if ($tanggal_default > $tahun_terpilih['tanggal_selesai']) {
         $tanggal_default = $tahun_terpilih['tanggal_mulai'];
     }
-
 }
 ?>
 
@@ -423,6 +416,83 @@ if ($tahun_terpilih) {
             border-radius: 8px;
         }
 
+        /* SEARCH DI KANAN */
+        .header-tabel {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .judul-tabel {
+            flex: 1;
+            padding-top: 10px;
+        }
+
+        .area-pencarian {
+            width: 100%;
+            max-width: 330px;
+            flex-shrink: 0;
+        }
+
+        .area-pencarian .form-label {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .baris-search {
+            display: flex;
+            gap: 10px;
+        }
+
+        .baris-search .form-control {
+            min-width: 0;
+            height: 44px;
+        }
+
+        .btn-search {
+            height: 44px;
+            padding: 0 20px;
+            background: var(--teal);
+            color: #fff;
+            border: 1px solid var(--teal);
+            border-radius: 9px;
+            font-weight: 600;
+        }
+
+        .btn-search:hover {
+            background: #0f9f91;
+            border-color: #0f9f91;
+            color: #fff;
+        }
+
+        .btn-reset {
+            height: 44px;
+            padding: 0 14px;
+            background: #fff;
+            color: #526078;
+            border: 1px solid #dce3ed;
+            border-radius: 9px;
+            font-weight: 600;
+        }
+
+        .btn-reset:hover {
+            background: #f4f7fb;
+            color: var(--navy);
+        }
+
+        .filter-kelas {
+            width: 190px;
+            margin-left: auto;
+            margin-top: 12px;
+        }
+
+        .filter-kelas .form-select {
+            height: 44px;
+        }
+
         @media (max-width: 768px) {
             main {
                 padding: 18px !important;
@@ -436,6 +506,23 @@ if ($tahun_terpilih) {
 
             .content-card {
                 padding: 15px;
+            }
+
+            .header-tabel {
+                flex-direction: column;
+                gap: 18px;
+            }
+
+            .judul-tabel {
+                padding-top: 0;
+            }
+
+            .area-pencarian {
+                max-width: 100%;
+            }
+
+            .filter-kelas {
+                width: 100%;
             }
         }
     </style>
@@ -547,34 +634,61 @@ if ($tahun_terpilih) {
                 <!-- TABEL SISWA -->
                 <div class="content-card">
 
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+                    <div class="header-tabel">
 
-                        <div>
+                        <!-- JUDUL DI KIRI -->
+                        <div class="judul-tabel">
                             <h5 class="fw-bold mb-1">Daftar Penempatan Siswa</h5>
                             <small class="text-muted">
                                 Tahun Ajaran <?= htmlspecialchars($tahun_terpilih['nama']); ?>
                             </small>
                         </div>
 
-                        <div class="d-flex flex-wrap gap-2">
+                        <!-- SEARCH DI KANAN -->
+                        <div class="area-pencarian">
 
-                            <input type="text" id="cariSiswa"
-                                class="form-control"
-                                style="max-width: 230px;"
-                                placeholder="Cari NIS atau nama...">
+                            <label for="cariSiswa" class="form-label">
+                                Cari Data Siswa
+                            </label>
 
-                            <select id="filterKelas" class="form-select"
-                                style="max-width: 190px;">
-                                <option value="">Semua Kelas</option>
-                                <option value="belum">Belum Ditempatkan</option>
+                            <div class="baris-search">
 
-                                <?php foreach ($data_kelas as $kls): ?>
-                                    <option value="<?= htmlspecialchars(strtolower($kls['nama'])); ?>">
-                                        <?= htmlspecialchars($kls['nama']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <input type="text"
+                                    id="cariSiswa"
+                                    class="form-control"
+                                    placeholder="Cari NIS atau nama...">
 
-                            </select>
+                                <button type="button"
+                                    id="tombolCariSiswa"
+                                    class="btn btn-search">
+                                    Cari
+                                </button>
+
+                                <button type="button"
+                                    id="resetCariSiswa"
+                                    class="btn btn-reset"
+                                    style="display:none;">
+                                    Reset
+                                </button>
+
+                            </div>
+
+                            <!-- FILTER DI BAWAH SEARCH -->
+                            <div class="filter-kelas">
+
+                                <select id="filterKelas" class="form-select">
+                                    <option value="">Semua Kelas</option>
+                                    <option value="belum">Belum Ditempatkan</option>
+
+                                    <?php foreach ($data_kelas as $kls): ?>
+                                        <option value="<?= htmlspecialchars(strtolower($kls['nama'])); ?>">
+                                            <?= htmlspecialchars($kls['nama']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+
+                                </select>
+
+                            </div>
 
                         </div>
 
@@ -741,6 +855,8 @@ if ($tahun_terpilih) {
 
 // PENCARIAN DAN FILTER SISWA
 const cariSiswa = document.getElementById('cariSiswa');
+const tombolCariSiswa = document.getElementById('tombolCariSiswa');
+const resetCariSiswa = document.getElementById('resetCariSiswa');
 const filterKelas = document.getElementById('filterKelas');
 const barisSiswa = document.querySelectorAll('#tabelSiswa tr[data-cari]');
 const tidakDitemukan = document.getElementById('tidakDitemukan');
@@ -778,12 +894,39 @@ function filterDataSiswa() {
             jumlahTampil === 0 ? '' : 'none';
     }
 
+    if (resetCariSiswa) {
+        resetCariSiswa.style.display =
+            kataKunci !== '' ? '' : 'none';
+    }
 }
 
+// TOMBOL CARI
+if (tombolCariSiswa) {
+    tombolCariSiswa.addEventListener('click', filterDataSiswa);
+}
+
+// PENCARIAN LANGSUNG SAAT MENGETIK
 if (cariSiswa) {
     cariSiswa.addEventListener('input', filterDataSiswa);
+
+    cariSiswa.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            filterDataSiswa();
+        }
+    });
 }
 
+// RESET PENCARIAN
+if (resetCariSiswa) {
+    resetCariSiswa.addEventListener('click', function() {
+        cariSiswa.value = '';
+        filterDataSiswa();
+        cariSiswa.focus();
+    });
+}
+
+// FILTER KELAS
 if (filterKelas) {
     filterKelas.addEventListener('change', filterDataSiswa);
 }

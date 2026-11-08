@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -12,10 +13,16 @@ $pesan = '';
 
 if (isset($_POST['login'])) {
     $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
+    $password = $_POST['password'];
 
-    // Menggunakan Prepared Statement untuk mencegah SQL Injection
-    $stmt = mysqli_prepare($koneksi, "SELECT id, name, email, password, role FROM t_users WHERE email = ?");
+    // MENGAMBIL DATA AKUN
+    $stmt = mysqli_prepare(
+        $koneksi,
+        "SELECT id, name, email, password, role
+         FROM t_users
+         WHERE email = ?"
+    );
+
     mysqli_stmt_bind_param($stmt, "s", $email);
     mysqli_stmt_execute($stmt);
     $hasil = mysqli_stmt_get_result($stmt);
@@ -24,20 +31,60 @@ if (isset($_POST['login'])) {
         $data = mysqli_fetch_assoc($hasil);
 
         if (password_verify($password, $data['password'])) {
-            $_SESSION['login'] = true;
-            $_SESSION['id'] = $data['id'];
-            $_SESSION['name'] = $data['name'];
-            $_SESSION['email'] = $data['email'];
-            $_SESSION['role'] = $data['role'];
 
-            header("Location: dashboard.php");
-            exit;
+            // CEK STATUS AKTIF GURU/PETUGAS
+            $boleh_login = true;
+
+            if ($data['role'] === 'petugas') {
+                $stmt_guru = mysqli_prepare(
+                    $koneksi,
+                    "SELECT id
+                     FROM t_guru
+                     WHERE user_id = ?
+                     AND status_aktif = 1
+                     LIMIT 1"
+                );
+
+                mysqli_stmt_bind_param(
+                    $stmt_guru,
+                    "i",
+                    $data['id']
+                );
+
+                mysqli_stmt_execute($stmt_guru);
+                $hasil_guru = mysqli_stmt_get_result($stmt_guru);
+
+                if (!$hasil_guru || mysqli_num_rows($hasil_guru) !== 1) {
+                    $boleh_login = false;
+                }
+
+                mysqli_stmt_close($stmt_guru);
+            }
+
+            if ($boleh_login) {
+                // MEMPERBARUI SESSION ID
+                session_regenerate_id(true);
+
+                $_SESSION['login'] = true;
+                $_SESSION['id'] = $data['id'];
+                $_SESSION['name'] = $data['name'];
+                $_SESSION['email'] = $data['email'];
+                $_SESSION['role'] = $data['role'];
+
+                header("Location: dashboard.php");
+                exit;
+            } else {
+                $pesan = "Akun guru tidak aktif atau belum terdaftar dengan benar. Silakan hubungi Admin.";
+            }
+
         } else {
             $pesan = "Email atau password salah!";
         }
     } else {
         $pesan = "Email atau password salah!";
     }
+
+    mysqli_stmt_close($stmt);
 }
 ?>
 
@@ -51,7 +98,7 @@ if (isset($_POST['login'])) {
 
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -143,7 +190,7 @@ if (isset($_POST['login'])) {
     <div class="d-flex justify-content-center align-items-center vh-100 px-3">
         <div class="card login-card">
             <div class="card-body p-4 p-sm-5">
-                
+
                 <div class="login-header">
                     <div class="brand-icon">
                         <i class="fas fa-shield-alt"></i>
@@ -155,7 +202,7 @@ if (isset($_POST['login'])) {
                 <?php if (!empty($pesan)) { ?>
                     <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
                         <i class="fas fa-exclamation-circle me-2"></i>
-                        <div><?= htmlspecialchars($pesan); ?></div>
+                        <div><?php echo htmlspecialchars($pesan); ?></div>
                     </div>
                 <?php } ?>
 

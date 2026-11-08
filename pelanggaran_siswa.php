@@ -1,5 +1,7 @@
+
 <?php
 session_start();
+
 if (!isset($_SESSION['login'])) {
     header("Location: login.php");
     exit;
@@ -9,6 +11,12 @@ include 'config/koneksi.php';
 
 $halaman = 'pelanggaran_siswa';
 $role = $_SESSION['role'] ?? '';
+
+// Hanya Guru (petugas) yang boleh mengakses halaman ini
+if ($role !== 'petugas') {
+    header("Location: dashboard.php");
+    exit;
+}
 
 $pesan = '';
 $jenis_pesan = '';
@@ -29,14 +37,15 @@ $status = 'tercatat'; // Default status
 */
 if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_GET['tanggal'])) {
     header('Content-Type: application/json');
-    $s_id = (int)$_GET['siswa_id'];
+
+    $s_id = (int) $_GET['siswa_id'];
     $tgl = trim($_GET['tanggal']);
 
     // Cari penempatan kelas aktif siswa pada tanggal tersebut
     $q_penempatan = mysqli_query($koneksi, "
-        SELECT kelas_id, tahun_ajaran_id 
-        FROM t_kelas_siswa 
-        WHERE siswa_id = '$s_id' AND status_aktif = 1 
+        SELECT kelas_id, tahun_ajaran_id
+        FROM t_kelas_siswa
+        WHERE siswa_id = '$s_id' AND status_aktif = 1
         AND tanggal_mulai <= '$tgl' AND (tanggal_selesai IS NULL OR tanggal_selesai = '0000-00-00' OR tanggal_selesai >= '$tgl')
         ORDER BY id DESC LIMIT 1
     ");
@@ -62,10 +71,10 @@ $query_tahun = mysqli_query($koneksi, "SELECT id, nama FROM t_tahun_ajaran WHERE
 $query_siswa = mysqli_query($koneksi, "SELECT id, nis, nama FROM t_siswa WHERE status_aktif = 1 ORDER BY nama ASC");
 $query_kelas = mysqli_query($koneksi, "SELECT id, nama, tingkat, jurusan FROM t_kelas WHERE status_aktif = 1 ORDER BY nama ASC");
 $query_pelanggaran = mysqli_query($koneksi, "
-    SELECT p.id, p.nama, p.kode, p.poin, p.pelanggaran_kategori_id, k.nama AS nama_kategori 
-    FROM t_pelanggaran p 
-    INNER JOIN t_pelanggaran_kategori k ON p.pelanggaran_kategori_id = k.id 
-    WHERE p.status_aktif = 1 AND k.status_aktif = 1 
+    SELECT p.id, p.nama, p.kode, p.poin, p.pelanggaran_kategori_id, k.nama AS nama_kategori
+    FROM t_pelanggaran p
+    INNER JOIN t_pelanggaran_kategori k ON p.pelanggaran_kategori_id = k.id
+    WHERE p.status_aktif = 1 AND k.status_aktif = 1
     ORDER BY p.nama ASC
 ");
 
@@ -130,9 +139,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Cek penempatan kelas siswa
             $stmt = mysqli_prepare($koneksi, "
-                SELECT id FROM t_kelas_siswa 
-                WHERE siswa_id = ? AND kelas_id = ? AND tahun_ajaran_id = ? AND status_aktif = 1 
-                AND tanggal_mulai <= ? AND (tanggal_selesai IS NULL OR tanggal_selesai = '0000-00-00' OR tanggal_selesai >= ?) 
+                SELECT id FROM t_kelas_siswa
+                WHERE siswa_id = ? AND kelas_id = ? AND tahun_ajaran_id = ? AND status_aktif = 1
+                AND tanggal_mulai <= ? AND (tanggal_selesai IS NULL OR tanggal_selesai = '0000-00-00' OR tanggal_selesai >= ?)
                 LIMIT 1
             ");
             mysqli_stmt_bind_param($stmt, "iiiss", $siswa_id, $kelas_id, $tahun_ajaran_id, $tanggal, $tanggal);
@@ -142,10 +151,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Ambil jenis pelanggaran
             $stmt = mysqli_prepare($koneksi, "
-                SELECT p.id, p.nama, p.poin, p.pelanggaran_kategori_id 
-                FROM t_pelanggaran p 
-                INNER JOIN t_pelanggaran_kategori k ON p.pelanggaran_kategori_id = k.id 
-                WHERE p.id = ? AND p.status_aktif = 1 AND k.status_aktif = 1 
+                SELECT p.id, p.nama, p.poin, p.pelanggaran_kategori_id
+                FROM t_pelanggaran p
+                INNER JOIN t_pelanggaran_kategori k ON p.pelanggaran_kategori_id = k.id
+                WHERE p.id = ? AND p.status_aktif = 1 AND k.status_aktif = 1
                 LIMIT 1
             ");
             mysqli_stmt_bind_param($stmt, "i", $pelanggaran_id);
@@ -166,8 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = mysqli_prepare($koneksi, "
                     INSERT INTO t_pelanggaran_siswa (
-                        tahun_ajaran_id, siswa_id, nama_siswa, kelas_id, nama_kelas, 
-                        pelanggaran_id, nama_pelanggaran, pelanggaran_kategori_id, 
+                        tahun_ajaran_id, siswa_id, nama_siswa, kelas_id, nama_kelas,
+                        pelanggaran_id, nama_pelanggaran, pelanggaran_kategori_id,
                         guru_id, nama_guru, tanggal, keterangan, poin, tindakan, status
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
@@ -212,13 +221,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             --background: #f4f7fb;
             --border: #e5eaf1;
         }
+
         body { background: var(--background); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .main-content { margin-left: 16.666667%; padding: 30px; }
         .content-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .form-label { font-weight: 600; color: var(--navy); font-size: 14px; }
         .form-control { border-radius: 10px; border: 1px solid #cbd5e1; padding: 10px 14px; }
         .form-control:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15); }
-        
+
         /* Penyesuaian Tom Select agar selaras dengan tema Navy-Teal */
         .ts-control {
             border-radius: 10px !important;
@@ -226,10 +236,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 10px 14px !important;
             box-shadow: none !important;
         }
+
         .ts-wrapper.focus .ts-control {
             border-color: var(--teal) !important;
             box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
         }
+
         .ts-dropdown {
             border-radius: 10px !important;
             margin-top: 5px !important;
@@ -237,7 +249,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
         }
 
-        @media (max-width: 767.98px) { .main-content { margin-left: 0; padding: 15px; } }
+        @media (max-width: 767.98px) {
+            .main-content { margin-left: 0; padding: 15px; }
+        }
     </style>
 </head>
 <body>
@@ -357,9 +371,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!-- Tom Select JS CDN -->
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", function(){
+    document.addEventListener("DOMContentLoaded", function() {
         // Inisialisasi Tom Select
         const tomSelectInstances = {};
+
         document.querySelectorAll('.searchable-select').forEach((el) => {
             tomSelectInstances[el.id] = new TomSelect(el, {
                 create: false,
@@ -389,10 +404,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (tomSelectInstances['kelas_id']) {
                             tomSelectInstances['kelas_id'].setValue(data.kelas_id);
                         }
+
                         // Set nilai ke Tom Select Tahun Ajaran
                         if (tomSelectInstances['tahun_ajaran_id']) {
                             tomSelectInstances['tahun_ajaran_id'].setValue(data.tahun_ajaran_id);
                         }
+
                         infoAutoFill.innerHTML = "✅ <span class='text-success fw-bold'>Kelas dan Tahun Ajaran terisi otomatis sesuai data siswa!</span>";
                     } else {
                         infoAutoFill.innerHTML = "⚠️ <span class='text-danger'>Penempatan kelas untuk siswa ini tidak ditemukan pada tanggal tersebut.</span>";
@@ -404,10 +421,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (siswaSelect) {
             siswaSelect.addEventListener('change', fetchSiswaInfo);
         }
+
         if (tanggalInput) {
             tanggalInput.addEventListener('change', fetchSiswaInfo);
         }
     });
 </script>
+
 </body>
 </html>

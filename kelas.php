@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -6,89 +7,414 @@ if (!isset($_SESSION['login'])) {
     exit;
 }
 
+// Hanya Admin yang boleh mengelola data kelas
+if (($_SESSION['role'] ?? '') !== 'admin') {
+    header("Location: dashboard.php");
+    exit;
+}
+
 include 'config/koneksi.php';
 
 $halaman = 'kelas';
 
-// TAMBAH DATA
-if (isset($_POST['tambah'])) {
-    $nama = $_POST['nama'];
-    $tingkat = $_POST['tingkat'];
-    $jurusan = $_POST['jurusan'];
-    $status_aktif = $_POST['status_aktif'];
+// Fungsi bantuan
+function escapeKelas($data)
+{
+    return htmlspecialchars((string)$data, ENT_QUOTES, 'UTF-8');
+}
 
-    $sql = "INSERT INTO t_kelas
-            (nama, tingkat, jurusan, status_aktif)
-            VALUES
-            ('$nama', '$tingkat', '$jurusan', '$status_aktif')";
-
-    mysqli_query($koneksi, $sql);
-    header("Location: kelas.php");
+function redirectKelas($pesan)
+{
+    header("Location: kelas.php?pesan=" . urlencode($pesan));
     exit;
 }
 
-// HAPUS DATA
-if (isset($_GET['hapus'])) {
-    $id = (int)$_GET['hapus'];
-    mysqli_query($koneksi, "DELETE FROM t_kelas WHERE id = '$id'");
-    header("Location: kelas.php");
-    exit;
+// CSRF TOKEN
+if (empty($_SESSION['csrf_kelas'])) {
+    $_SESSION['csrf_kelas'] = bin2hex(random_bytes(32));
 }
 
-// EDIT DATA
-if (isset($_POST['edit'])) {
-    $id = $_POST['id'];
-    $nama = $_POST['nama'];
-    $tingkat = $_POST['tingkat'];
-    $jurusan = $_POST['jurusan'];
-    $status_aktif = $_POST['status_aktif'];
+$csrf_token = $_SESSION['csrf_kelas'];
 
-    $sql = "UPDATE t_kelas SET
-            nama = '$nama',
-            tingkat = '$tingkat',
-            jurusan = '$jurusan',
-            status_aktif = '$status_aktif'
-            WHERE id = '$id'";
+// Memeriksa apakah kelas masih memiliki relasi data
+function hitungRelasiKelas($koneksi, $tabel, $id)
+{
+    // Nama tabel berasal dari daftar tetap, bukan input pengguna
+    $tabel_diizinkan = [
+        't_kelas_siswa',
+        't_wali_kelas',
+        't_pelanggaran_siswa'
+    ];
 
-    mysqli_query($koneksi, $sql);
-    header("Location: kelas.php");
-    exit;
+    if (!in_array($tabel, $tabel_diizinkan, true)) {
+        return 0;
+    }
+
+    $stmt = mysqli_prepare(
+        $koneksi,
+        "SELECT COUNT(*) FROM $tabel WHERE kelas_id = ?"
+    );
+
+    if (!$stmt) {
+        throw new Exception("Gagal memeriksa relasi kelas.");
+    }
+
+    mysqli_stmt_bind_param($stmt, "i", $id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_bind_result($stmt, $jumlah);
+    mysqli_stmt_fetch($stmt);
+    mysqli_stmt_close($stmt);
+
+    return (int)$jumlah;
+}
+
+// PROSES TAMBAH, EDIT, NONAKTIFKAN, DAN HAPUS
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    // Validasi CSRF
+    if (
+        !isset($_POST['csrf_token']) ||
+        !hash_equals($_SESSION['csrf_kelas'], $_POST['csrf_token'])
+    ) {
+        redirectKelas("Permintaan tidak valid. Silakan coba lagi.");
+    }
+
+    // Mengambil dan memvalidasi data umum
+    $nama = trim($_POST['nama'] ?? '');
+    $tingkat = trim($_POST['tingkat'] ?? '');
+    $jurusan = trim($_POST['jurusan'] ?? '');
+    $status_aktif = $_POST['status_aktif'] ?? '';
+
+    // TAMBAH DATA
+    if (isset($_POST['tambah'])) {
+
+        if ($nama === '' || $tingkat === '' || $jurusan === '') {
+            redirectKelas("Semua data kelas wajib diisi.");
+        }
+
+        if (!in_array($status_aktif, ['0', '1'], true)) {
+            redirectKelas("Status kelas tidak valid.");
+        }
+
+        // Cek nama kelas duplikat
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "SELECT id FROM t_kelas WHERE nama = ? LIMIT 1"
+        );
+
+        mysqli_stmt_bind_param($stmt, "s", $nama);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_store_result($stmt);
+
+        $duplikat = mysqli_stmt_num_rows($stmt) > 0;
+        mysqli_stmt_close($stmt);
+
+        if ($duplikat) {
+            redirectKelas("Nama kelas sudah terdaftar.");
+        }
+
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "INSERT INTO t_kelas (nama, tingkat, jurusan, status_aktif)
+             VALUES (?, ?, ?, ?)"
+        );
+
+        mysqli_stmt_bind_param(
+            $stmt,
+            "sssi",
+            $nama,
+            $tingkat,
+            $jurusan,
+            $status_aktif
+        );
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            redirectKelas("Data kelas berhasil ditambahkan.");
+        }
+
+        mysqli_stmt_close($stmt);
+        redirectKelas("Gagal menambahkan data kelas.");
+    }
+
+    // EDIT DATA
+    if (isset($_POST['edit'])) {
+
+        $id = (int)($_POST['id'] ?? 0);
+
+        if ($id <= 0 || $nama === '' || $tingkat === '' || $jurusan === '') {
+            redirectKelas("Data kelas tidak valid.");
+        }
+
+        if (!in_array($status_aktif, ['0', '1'], true)) {
+            redirectKelas("Status kelas tidak valid.");
+        }
+
+        // Pastikan kelas tersedia
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "SELECT id FROM t_kelas WHERE id = ?"
+        );
+
+        mysqli_stmt_bind_param($stmt, "i", $id);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_store_result($stmt);
+
+        $kelas_ada = mysqli_stmt_num_rows($stmt) > 0;
+        mysqli_stmt_close($stmt);
+
+        if (!$kelas_ada) {
+            redirectKelas("Data kelas tidak ditemukan.");
+        }
+
+        // Cek nama kelas duplikat selain data yang sedang diedit
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "SELECT id FROM t_kelas WHERE nama = ? AND id != ? LIMIT 1"
+        );
+
+        mysqli_stmt_bind_param($stmt, "si", $nama, $id);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_store_result($stmt);
+
+        $duplikat = mysqli_stmt_num_rows($stmt) > 0;
+        mysqli_stmt_close($stmt);
+
+        if ($duplikat) {
+            redirectKelas("Nama kelas sudah digunakan.");
+        }
+
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "UPDATE t_kelas
+             SET nama = ?, tingkat = ?, jurusan = ?, status_aktif = ?
+             WHERE id = ?"
+        );
+
+        mysqli_stmt_bind_param(
+            $stmt,
+            "sssii",
+            $nama,
+            $tingkat,
+            $jurusan,
+            $status_aktif,
+            $id
+        );
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            redirectKelas("Data kelas berhasil diperbarui.");
+        }
+
+        mysqli_stmt_close($stmt);
+        redirectKelas("Gagal memperbarui data kelas.");
+    }
+
+    // NONAKTIFKAN KELAS
+    if (isset($_POST['nonaktifkan'])) {
+
+        $id = (int)($_POST['id'] ?? 0);
+
+        if ($id <= 0) {
+            redirectKelas("ID kelas tidak valid.");
+        }
+
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "UPDATE t_kelas SET status_aktif = 0 WHERE id = ?"
+        );
+
+        mysqli_stmt_bind_param($stmt, "i", $id);
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            redirectKelas("Kelas berhasil dinonaktifkan.");
+        }
+
+        mysqli_stmt_close($stmt);
+        redirectKelas("Gagal menonaktifkan kelas.");
+    }
+
+    // HAPUS PERMANEN
+    if (isset($_POST['hapus'])) {
+
+        $id = (int)($_POST['id'] ?? 0);
+
+        if ($id <= 0) {
+            redirectKelas("ID kelas tidak valid.");
+        }
+
+        try {
+            mysqli_begin_transaction($koneksi);
+
+            // Kunci data kelas selama proses pemeriksaan dan penghapusan
+            $stmt = mysqli_prepare(
+                $koneksi,
+                "SELECT id FROM t_kelas WHERE id = ? FOR UPDATE"
+            );
+
+            mysqli_stmt_bind_param($stmt, "i", $id);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_store_result($stmt);
+
+            $kelas_ada = mysqli_stmt_num_rows($stmt) > 0;
+            mysqli_stmt_close($stmt);
+
+            if (!$kelas_ada) {
+                throw new Exception("Data kelas tidak ditemukan.");
+            }
+
+            // Periksa semua relasi kelas
+            $total_relasi = 0;
+
+            $total_relasi += hitungRelasiKelas(
+                $koneksi,
+                't_kelas_siswa',
+                $id
+            );
+
+            $total_relasi += hitungRelasiKelas(
+                $koneksi,
+                't_wali_kelas',
+                $id
+            );
+
+            $total_relasi += hitungRelasiKelas(
+                $koneksi,
+                't_pelanggaran_siswa',
+                $id
+            );
+
+            if ($total_relasi > 0) {
+                throw new Exception(
+                    "Kelas tidak dapat dihapus karena masih memiliki data terkait. Gunakan fitur Nonaktifkan."
+                );
+            }
+
+            $stmt = mysqli_prepare(
+                $koneksi,
+                "DELETE FROM t_kelas WHERE id = ?"
+            );
+
+            mysqli_stmt_bind_param($stmt, "i", $id);
+
+            if (!mysqli_stmt_execute($stmt)) {
+                mysqli_stmt_close($stmt);
+                throw new Exception("Gagal menghapus data kelas.");
+            }
+
+            mysqli_stmt_close($stmt);
+            mysqli_commit($koneksi);
+
+            redirectKelas("Data kelas berhasil dihapus permanen.");
+
+        } catch (Throwable $e) {
+            mysqli_rollback($koneksi);
+            redirectKelas($e->getMessage());
+        }
+    }
 }
 
 // DATA UNTUK EDIT
 $data_edit = null;
+
 if (isset($_GET['edit'])) {
-    $id = $_GET['edit'];
-    $hasil_edit = mysqli_query($koneksi, "SELECT * FROM t_kelas WHERE id = '$id'");
-    $data_edit = mysqli_fetch_assoc($hasil_edit);
+    $id_edit = (int)$_GET['edit'];
+
+    if ($id_edit > 0) {
+        $stmt = mysqli_prepare(
+            $koneksi,
+            "SELECT * FROM t_kelas WHERE id = ?"
+        );
+
+        mysqli_stmt_bind_param($stmt, "i", $id_edit);
+        mysqli_stmt_execute($stmt);
+
+        $hasil_edit = mysqli_stmt_get_result($stmt);
+        $data_edit = mysqli_fetch_assoc($hasil_edit);
+
+        mysqli_stmt_close($stmt);
+    }
 }
 
-/*
-|--------------------------------------------------------------------------
-| KONFIGURASI PAGINATION & PENCARIAN KELAS (SQL-BASED)
-|--------------------------------------------------------------------------
-*/
-$batas = 10; // Jumlah data kelas per halaman
-$halaman_aktif = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$halaman_aktif = ($halaman_aktif < 1) ? 1 : $halaman_aktif;
-$mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
+// KONFIGURASI PAGINATION DAN PENCARIAN
+$batas = 10;
 
+$halaman_aktif = max(1, (int)($_GET['page'] ?? 1));
 $cari = trim($_GET['cari'] ?? '');
+
 $where_sql = "";
+$parameter_cari = [];
 
 if ($cari !== '') {
-    $cari_esc = mysqli_real_escape_string($koneksi, $cari);
-    $where_sql = "WHERE nama LIKE '%$cari_esc%' OR tingkat LIKE '%$cari_esc%' OR jurusan LIKE '%$cari_esc%'";
+    $where_sql = "WHERE nama LIKE ? OR tingkat LIKE ? OR jurusan LIKE ?";
+    $kata_cari = "%$cari%";
+
+    $parameter_cari = [
+        $kata_cari,
+        $kata_cari,
+        $kata_cari
+    ];
 }
 
-// Hitung total data kelas sesuai pencarian
-$query_jml = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_kelas $where_sql");
-$row_jml = mysqli_fetch_assoc($query_jml);
-$total_data = $row_jml['total'];
-$total_halaman = ceil($total_data / $batas);
+// Hitung total data
+$stmt = mysqli_prepare(
+    $koneksi,
+    "SELECT COUNT(*) AS total FROM t_kelas $where_sql"
+);
 
-// Ambil data kelas dengan LIMIT dan OFFSET
-$data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY id ASC LIMIT $mulai, $batas");
+if ($cari !== '') {
+    mysqli_stmt_bind_param(
+        $stmt,
+        "sss",
+        $parameter_cari[0],
+        $parameter_cari[1],
+        $parameter_cari[2]
+    );
+}
+
+mysqli_stmt_execute($stmt);
+$hasil_jumlah = mysqli_stmt_get_result($stmt);
+$row_jumlah = mysqli_fetch_assoc($hasil_jumlah);
+$total_data = (int)$row_jumlah['total'];
+mysqli_stmt_close($stmt);
+
+$total_halaman = (int)ceil($total_data / $batas);
+
+// Pastikan halaman tidak melebihi jumlah halaman
+if ($total_halaman > 0 && $halaman_aktif > $total_halaman) {
+    $halaman_aktif = $total_halaman;
+}
+
+$mulai = ($halaman_aktif - 1) * $batas;
+
+// Ambil data kelas
+$stmt = mysqli_prepare(
+    $koneksi,
+    "SELECT * FROM t_kelas
+     $where_sql
+     ORDER BY id ASC
+     LIMIT ?, ?"
+);
+
+if ($cari !== '') {
+    mysqli_stmt_bind_param(
+        $stmt,
+        "sssii",
+        $parameter_cari[0],
+        $parameter_cari[1],
+        $parameter_cari[2],
+        $mulai,
+        $batas
+    );
+} else {
+    mysqli_stmt_bind_param($stmt, "ii", $mulai, $batas);
+}
+
+mysqli_stmt_execute($stmt);
+$data_kelas = mysqli_stmt_get_result($stmt);
+mysqli_stmt_close($stmt);
+
 ?>
 
 <!DOCTYPE html>
@@ -100,6 +426,7 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
         :root {
             --navy: #101c35;
@@ -209,16 +536,21 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
             color: #fff;
         }
 
-        .btn-edit {
-            background: #eaf2ff;
-            color: #2458a6;
-            border: 1px solid #d8e6ff;
+        .btn-edit,
+        .btn-delete,
+        .btn-nonaktif {
             border-radius: 7px;
             padding: 6px 11px;
             font-size: 13px;
             font-weight: 600;
             text-decoration: none;
             display: inline-block;
+        }
+
+        .btn-edit {
+            background: #eaf2ff;
+            color: #2458a6;
+            border: 1px solid #d8e6ff;
         }
 
         .btn-edit:hover {
@@ -230,12 +562,7 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
             background: #fff0f0;
             color: #c33d4b;
             border: 1px solid #ffdddd;
-            border-radius: 7px;
-            padding: 6px 11px;
-            font-size: 13px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-block;
+            cursor: pointer;
         }
 
         .btn-delete:hover {
@@ -243,18 +570,19 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
             color: #a52634;
         }
 
-        .btn-cancel {
-            background: #fff;
-            border: 1px solid #dce3ed;
-            color: #526078;
-            border-radius: 9px;
-            padding: 10px 18px;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-block;
+        .btn-nonaktif {
+            background: #fff7e6;
+            color: #9a6700;
+            border: 1px solid #ffe6ad;
+            cursor: pointer;
         }
 
+        .btn-nonaktif:hover {
+            background: #ffefcc;
+            color: #805600;
+        }
+
+        .btn-cancel,
         .btn-reset {
             background: #fff;
             border: 1px solid #dce3ed;
@@ -262,12 +590,13 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
             border-radius: 9px;
             padding: 10px 16px;
             font-size: 14px;
-            white-space: nowrap;
+            font-weight: 600;
             text-decoration: none;
             display: inline-block;
         }
 
-        .btn-reset:hover {
+        .btn-reset:hover,
+        .btn-cancel:hover {
             background: #f4f7fb;
             color: var(--navy);
         }
@@ -346,17 +675,21 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
             main {
                 padding: 20px 14px !important;
             }
+
             .content-card {
                 padding: 17px;
             }
+
             .page-title {
                 font-size: 25px;
             }
+
             .form-actions {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
             }
+
             .search-area {
                 max-width: 100%;
             }
@@ -379,58 +712,99 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
                 </p>
             </div>
 
+            <?php if (isset($_GET['pesan'])) { ?>
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <?php echo escapeKelas($_GET['pesan']); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php } ?>
+
             <!-- FORM TAMBAH / EDIT KELAS -->
             <div class="content-card">
+
                 <?php if ($data_edit) { ?>
+
                     <h3 class="section-title">Edit Data Kelas</h3>
-                    <p class="section-description">Perbarui informasi kelas sesuai data yang diperlukan.</p>
+                    <p class="section-description">
+                        Perbarui informasi kelas sesuai data yang diperlukan.
+                    </p>
 
                     <form method="POST">
-                        <input type="hidden" name="id" value="<?php echo htmlspecialchars($data_edit['id']); ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo escapeKelas($csrf_token); ?>">
+                        <input type="hidden" name="id" value="<?php echo escapeKelas($data_edit['id']); ?>">
+
                         <div class="row g-3">
+
                             <div class="col-md-6">
                                 <label class="form-label">Nama Kelas</label>
-                                <input type="text" class="form-control" name="nama" value="<?php echo htmlspecialchars($data_edit['nama']); ?>" required>
+                                <input type="text" class="form-control" name="nama"
+                                    value="<?php echo escapeKelas($data_edit['nama']); ?>" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Tingkat</label>
-                                <input type="text" class="form-control" name="tingkat" value="<?php echo htmlspecialchars($data_edit['tingkat']); ?>" required>
+                                <input type="text" class="form-control" name="tingkat"
+                                    value="<?php echo escapeKelas($data_edit['tingkat']); ?>" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Jurusan</label>
-                                <input type="text" class="form-control" name="jurusan" value="<?php echo htmlspecialchars($data_edit['jurusan']); ?>" required>
+                                <input type="text" class="form-control" name="jurusan"
+                                    value="<?php echo escapeKelas($data_edit['jurusan']); ?>" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Status Aktif</label>
                                 <select class="form-select" name="status_aktif" required>
-                                    <option value="1" <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>Aktif</option>
-                                    <option value="0" <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>Tidak Aktif</option>
+                                    <option value="1" <?php if ($data_edit['status_aktif'] == 1) echo 'selected'; ?>>
+                                        Aktif
+                                    </option>
+                                    <option value="0" <?php if ($data_edit['status_aktif'] == 0) echo 'selected'; ?>>
+                                        Tidak Aktif
+                                    </option>
                                 </select>
                             </div>
+
                         </div>
+
                         <div class="form-actions d-flex gap-2 mt-4">
-                            <button type="submit" name="edit" class="btn btn-primary-custom">Simpan Perubahan</button>
+                            <button type="submit" name="edit" class="btn btn-primary-custom">
+                                Simpan Perubahan
+                            </button>
                             <a href="kelas.php" class="btn-cancel">Batal</a>
                         </div>
                     </form>
+
                 <?php } else { ?>
+
                     <h3 class="section-title">Tambah Data Kelas</h3>
-                    <p class="section-description">Masukkan informasi kelas baru ke dalam sistem.</p>
+                    <p class="section-description">
+                        Masukkan informasi kelas baru ke dalam sistem.
+                    </p>
 
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo escapeKelas($csrf_token); ?>">
+
                         <div class="row g-3">
+
                             <div class="col-md-6">
                                 <label class="form-label">Nama Kelas</label>
-                                <input type="text" class="form-control" name="nama" placeholder="Contoh: XI RPL 1" required>
+                                <input type="text" class="form-control" name="nama"
+                                    placeholder="Contoh: XI RPL 1" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Tingkat</label>
-                                <input type="text" class="form-control" name="tingkat" placeholder="Contoh: XI" required>
+                                <input type="text" class="form-control" name="tingkat"
+                                    placeholder="Contoh: XI" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Jurusan</label>
-                                <input type="text" class="form-control" name="jurusan" placeholder="Contoh: RPL" required>
+                                <input type="text" class="form-control" name="jurusan"
+                                    placeholder="Contoh: RPL" required>
                             </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Status Aktif</label>
                                 <select class="form-select" name="status_aktif" required>
@@ -438,39 +812,56 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
                                     <option value="0">Tidak Aktif</option>
                                 </select>
                             </div>
+
                         </div>
+
                         <div class="mt-4">
-                            <button type="submit" name="tambah" class="btn btn-primary-custom">Tambah Kelas</button>
+                            <button type="submit" name="tambah" class="btn btn-primary-custom">
+                                Tambah Kelas
+                            </button>
                         </div>
                     </form>
+
                 <?php } ?>
+
             </div>
 
-            <!-- TABEL & PENCARIAN KELAS -->
+            <!-- TABEL DAN PENCARIAN KELAS -->
             <div class="content-card">
+
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+
                     <div>
                         <h3 class="section-title mb-1">Daftar Kelas</h3>
-                        <p class="table-count mb-0">Total data: <?php echo $total_data; ?> kelas</p>
+                        <p class="table-count mb-0">
+                            Total data: <?php echo $total_data; ?> kelas
+                        </p>
                     </div>
 
-                    <!-- FORM PENCARIAN KELAS (GET METHOD) -->
                     <div class="search-area">
                         <form method="GET" action="kelas.php">
                             <label for="cari" class="form-label">Cari Data Kelas</label>
+
                             <div class="d-flex gap-2">
-                                <input type="search" name="cari" id="cari" class="form-control" placeholder="Cari nama kelas, tingkat, jurusan..." value="<?php echo htmlspecialchars($cari); ?>">
+                                <input type="search" name="cari" id="cari"
+                                    class="form-control"
+                                    placeholder="Cari nama kelas, tingkat, jurusan..."
+                                    value="<?php echo escapeKelas($cari); ?>">
+
                                 <button type="submit" class="btn btn-teal">Cari</button>
+
                                 <?php if ($cari !== '') { ?>
                                     <a href="kelas.php" class="btn-reset">Reset</a>
                                 <?php } ?>
                             </div>
                         </form>
                     </div>
+
                 </div>
 
                 <div class="table-responsive">
                     <table class="table">
+
                         <thead>
                             <tr>
                                 <th>No</th>
@@ -481,65 +872,133 @@ $data_kelas = mysqli_query($koneksi, "SELECT * FROM t_kelas $where_sql ORDER BY 
                                 <th>Aksi</th>
                             </tr>
                         </thead>
+
                         <tbody>
+
                             <?php
                             $no = $mulai + 1;
+
                             if (mysqli_num_rows($data_kelas) > 0) {
                                 while ($kelas = mysqli_fetch_assoc($data_kelas)) {
                             ?>
-                                    <tr>
-                                        <td><?php echo $no++; ?></td>
-                                        <td class="fw-semibold"><?php echo htmlspecialchars($kelas['nama']); ?></td>
-                                        <td><?php echo htmlspecialchars($kelas['tingkat']); ?></td>
-                                        <td><?php echo htmlspecialchars($kelas['jurusan']); ?></td>
-                                        <td>
-                                            <?php if ($kelas['status_aktif'] == 1) { ?>
-                                                <span class="status-badge status-active">Aktif</span>
-                                            <?php } else { ?>
-                                                <span class="status-badge status-inactive">Tidak Aktif</span>
-                                            <?php } ?>
-                                        </td>
-                                        <td>
-                                            <div class="d-flex flex-wrap gap-2">
-                                                <a href="kelas.php?edit=<?php echo urlencode($kelas['id']); ?>" class="btn-edit">Edit</a>
-                                                <a href="kelas.php?hapus=<?php echo urlencode($kelas['id']); ?>" class="btn-delete" onclick="return confirm('Yakin ingin menghapus data kelas ini?');">Hapus</a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                            <?php 
-                                }
-                            } else { 
-                            ?>
+
                                 <tr>
-                                    <td colspan="6" class="empty-state">Data kelas tidak ditemukan.</td>
+                                    <td><?php echo $no++; ?></td>
+
+                                    <td class="fw-semibold">
+                                        <?php echo escapeKelas($kelas['nama']); ?>
+                                    </td>
+
+                                    <td><?php echo escapeKelas($kelas['tingkat']); ?></td>
+
+                                    <td><?php echo escapeKelas($kelas['jurusan']); ?></td>
+
+                                    <td>
+                                        <?php if ($kelas['status_aktif'] == 1) { ?>
+                                            <span class="status-badge status-active">Aktif</span>
+                                        <?php } else { ?>
+                                            <span class="status-badge status-inactive">Tidak Aktif</span>
+                                        <?php } ?>
+                                    </td>
+
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-2">
+
+                                            <a href="kelas.php?edit=<?php echo urlencode($kelas['id']); ?>"
+                                                class="btn-edit">
+                                                Edit
+                                            </a>
+
+                                            <?php if ($kelas['status_aktif'] == 1) { ?>
+
+                                                <form method="POST"
+                                                    onsubmit="return confirm('Yakin ingin menonaktifkan kelas ini?');">
+                                                    <input type="hidden" name="csrf_token"
+                                                        value="<?php echo escapeKelas($csrf_token); ?>">
+                                                    <input type="hidden" name="id"
+                                                        value="<?php echo escapeKelas($kelas['id']); ?>">
+
+                                                    <button type="submit" name="nonaktifkan"
+                                                        class="btn-nonaktif">
+                                                        Nonaktifkan
+                                                    </button>
+                                                </form>
+
+                                            <?php } ?>
+
+                                            <form method="POST"
+                                                onsubmit="return confirm('Yakin ingin menghapus permanen kelas ini? Data yang memiliki relasi tidak dapat dihapus.');">
+
+                                                <input type="hidden" name="csrf_token"
+                                                    value="<?php echo escapeKelas($csrf_token); ?>">
+                                                <input type="hidden" name="id"
+                                                    value="<?php echo escapeKelas($kelas['id']); ?>">
+
+                                                <button type="submit" name="hapus"
+                                                    class="btn-delete">
+                                                    Hapus
+                                                </button>
+
+                                            </form>
+
+                                        </div>
+                                    </td>
                                 </tr>
+
+                            <?php
+                                }
+                            } else {
+                            ?>
+
+                                <tr>
+                                    <td colspan="6" class="empty-state">
+                                        Data kelas tidak ditemukan.
+                                    </td>
+                                </tr>
+
                             <?php } ?>
+
                         </tbody>
                     </table>
                 </div>
 
-                <!-- NAVIGASI PAGINATION KELAS -->
+                <!-- PAGINATION -->
                 <?php if ($total_halaman > 1) { ?>
+
                     <nav class="mt-4">
                         <ul class="pagination justify-content-end mb-0">
-                            <!-- Tombol Previous -->
+
                             <li class="page-item <?php echo ($halaman_aktif <= 1) ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="kelas.php?page=<?php echo $halaman_aktif - 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Previous</a>
+                                <a class="page-link"
+                                    href="kelas.php?page=<?php echo $halaman_aktif - 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">
+                                    Previous
+                                </a>
                             </li>
 
-                            <!-- Angka Halaman -->
                             <?php for ($i = 1; $i <= $total_halaman; $i++) { ?>
+
                                 <li class="page-item <?php echo ($halaman_aktif == $i) ? 'active' : ''; ?>">
-                                    <a class="page-link" href="kelas.php?page=<?php echo $i; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>" style="<?php echo ($halaman_aktif == $i) ? 'background-color: var(--teal); border-color: var(--teal); color: white;' : 'color: var(--navy);'; ?>"><?php echo $i; ?></a>
+                                    <a class="page-link"
+                                        href="kelas.php?page=<?php echo $i; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>"
+                                        style="<?php echo ($halaman_aktif == $i)
+                                            ? 'background-color: var(--teal); border-color: var(--teal); color: white;'
+                                            : 'color: var(--navy);'; ?>">
+                                        <?php echo $i; ?>
+                                    </a>
                                 </li>
+
                             <?php } ?>
 
-                            <!-- Tombol Next -->
                             <li class="page-item <?php echo ($halaman_aktif >= $total_halaman) ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="kelas.php?page=<?php echo $halaman_aktif + 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Next</a>
+                                <a class="page-link"
+                                    href="kelas.php?page=<?php echo $halaman_aktif + 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">
+                                    Next
+                                </a>
                             </li>
+
                         </ul>
                     </nav>
+
                 <?php } ?>
 
             </div>
