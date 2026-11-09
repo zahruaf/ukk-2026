@@ -156,7 +156,7 @@ if ($is_guru && !empty($email_user)) {
                 <a href="rekap_wali_kelas.php"
                    class="nav-link <?= ($halaman == 'rekap_wali_kelas') ? 'active' : '' ?>">
                     <span class="menu-mark"><i class="fas fa-id-card-alt"></i></span>
-                    Rekap Wali Kelas
+                    Rekap Kelas
                 </a>
             </li>
 
