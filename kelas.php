@@ -39,7 +39,6 @@ $csrf_token = $_SESSION['csrf_kelas'];
 // Memeriksa apakah kelas masih memiliki relasi data
 function hitungRelasiKelas($koneksi, $tabel, $id)
 {
-    // Nama tabel berasal dari daftar tetap, bukan input pengguna
     $tabel_diizinkan = [
         't_kelas_siswa',
         't_wali_kelas',
@@ -130,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (mysqli_stmt_execute($stmt)) {
             mysqli_stmt_close($stmt);
-            redirectKelas("Data kelas berhasil ditambahkan.");
+            redirectKelas("Data kelas berhasil ditambahkan. Tentukan wali kelas agar kelas muncul pada daftar tahun ajaran aktif.");
         }
 
         mysqli_stmt_close($stmt);
@@ -337,17 +336,70 @@ if (isset($_GET['edit'])) {
     }
 }
 
+// AMBIL TAHUN AJARAN AKTIF
+$stmt = mysqli_prepare(
+    $koneksi,
+    "SELECT id, nama
+     FROM t_tahun_ajaran
+     WHERE status_aktif = 1
+     ORDER BY id DESC
+     LIMIT 1"
+);
+
+mysqli_stmt_execute($stmt);
+$hasil_tahun_ajaran = mysqli_stmt_get_result($stmt);
+$tahun_ajaran_aktif = mysqli_fetch_assoc($hasil_tahun_ajaran);
+mysqli_stmt_close($stmt);
+
 // KONFIGURASI PAGINATION DAN PENCARIAN
 $batas = 10;
 
 $halaman_aktif = max(1, (int)($_GET['page'] ?? 1));
 $cari = trim($_GET['cari'] ?? '');
 
-$where_sql = "";
+$where_sql = "WHERE 1=1";
 $parameter_cari = [];
 
+if (!$tahun_ajaran_aktif) {
+
+    // Jika tidak ada tahun ajaran aktif, jangan tampilkan kelas
+    $where_sql .= " AND 1=0";
+
+} else {
+
+    $tahun_ajaran_id = (int)$tahun_ajaran_aktif['id'];
+
+    // Tampilkan kelas yang memiliki siswa ATAU wali kelas
+    // pada tahun ajaran aktif
+    $where_sql .= "
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM t_kelas_siswa ks
+                WHERE ks.kelas_id = k.id
+                AND ks.tahun_ajaran_id = ?
+            )
+            OR
+            EXISTS (
+                SELECT 1
+                FROM t_wali_kelas wk
+                WHERE wk.kelas_id = k.id
+                AND wk.tahun_ajaran_id = ?
+                AND wk.status_aktif = 1
+            )
+        )
+    ";
+}
+
 if ($cari !== '') {
-    $where_sql = "WHERE nama LIKE ? OR tingkat LIKE ? OR jurusan LIKE ?";
+    $where_sql .= "
+        AND (
+            k.nama LIKE ?
+            OR k.tingkat LIKE ?
+            OR k.jurusan LIKE ?
+        )
+    ";
+
     $kata_cari = "%$cari%";
 
     $parameter_cari = [
@@ -360,10 +412,34 @@ if ($cari !== '') {
 // Hitung total data
 $stmt = mysqli_prepare(
     $koneksi,
-    "SELECT COUNT(*) AS total FROM t_kelas $where_sql"
+    "SELECT COUNT(*) AS total
+     FROM t_kelas k
+     $where_sql"
 );
 
-if ($cari !== '') {
+if ($tahun_ajaran_aktif && $cari !== '') {
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "iisss",
+        $tahun_ajaran_id,
+        $tahun_ajaran_id,
+        $parameter_cari[0],
+        $parameter_cari[1],
+        $parameter_cari[2]
+    );
+
+} elseif ($tahun_ajaran_aktif) {
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "ii",
+        $tahun_ajaran_id,
+        $tahun_ajaran_id
+    );
+
+} elseif ($cari !== '') {
+
     mysqli_stmt_bind_param(
         $stmt,
         "sss",
@@ -391,13 +467,40 @@ $mulai = ($halaman_aktif - 1) * $batas;
 // Ambil data kelas
 $stmt = mysqli_prepare(
     $koneksi,
-    "SELECT * FROM t_kelas
+    "SELECT k.*
+     FROM t_kelas k
      $where_sql
-     ORDER BY id ASC
+     ORDER BY k.id ASC
      LIMIT ?, ?"
 );
 
-if ($cari !== '') {
+if ($tahun_ajaran_aktif && $cari !== '') {
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "iisssii",
+        $tahun_ajaran_id,
+        $tahun_ajaran_id,
+        $parameter_cari[0],
+        $parameter_cari[1],
+        $parameter_cari[2],
+        $mulai,
+        $batas
+    );
+
+} elseif ($tahun_ajaran_aktif) {
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "iiii",
+        $tahun_ajaran_id,
+        $tahun_ajaran_id,
+        $mulai,
+        $batas
+    );
+
+} elseif ($cari !== '') {
+
     mysqli_stmt_bind_param(
         $stmt,
         "sssii",
@@ -407,8 +510,15 @@ if ($cari !== '') {
         $mulai,
         $batas
     );
+
 } else {
-    mysqli_stmt_bind_param($stmt, "ii", $mulai, $batas);
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "ii",
+        $mulai,
+        $batas
+    );
 }
 
 mysqli_stmt_execute($stmt);
@@ -719,6 +829,21 @@ mysqli_stmt_close($stmt);
                 </div>
             <?php } ?>
 
+            <!-- INFORMASI TAHUN AJARAN AKTIF -->
+            <div class="alert alert-light border mb-4">
+                <strong>Tahun Ajaran Aktif:</strong>
+
+                <?php if ($tahun_ajaran_aktif) { ?>
+                    <span class="badge bg-success ms-1">
+                        <?php echo escapeKelas($tahun_ajaran_aktif['nama']); ?>
+                    </span>
+                <?php } else { ?>
+                    <span class="text-danger">
+                        Belum ada tahun ajaran aktif.
+                    </span>
+                <?php } ?>
+            </div>
+
             <!-- FORM TAMBAH / EDIT KELAS -->
             <div class="content-card">
 
@@ -738,7 +863,8 @@ mysqli_stmt_close($stmt);
                             <div class="col-md-6">
                                 <label class="form-label">Nama Kelas</label>
                                 <input type="text" class="form-control" name="nama"
-                                    value="<?php echo escapeKelas($data_edit['nama']); ?>" required>
+                                    value="<?php echo escapeKelas($data_edit['nama']); ?>"
+                                    autocomplete="off" required>
                             </div>
 
                             <div class="col-md-6">
@@ -790,7 +916,8 @@ mysqli_stmt_close($stmt);
                             <div class="col-md-6">
                                 <label class="form-label">Nama Kelas</label>
                                 <input type="text" class="form-control" name="nama"
-                                    placeholder="Contoh: XI RPL 1" required>
+                                    placeholder="Contoh: XI RPL 1"
+                                    autocomplete="off" required>
                             </div>
 
                             <div class="col-md-6">
@@ -952,7 +1079,13 @@ mysqli_stmt_close($stmt);
 
                                 <tr>
                                     <td colspan="6" class="empty-state">
-                                        Data kelas tidak ditemukan.
+
+                                        <?php if (!$tahun_ajaran_aktif) { ?>
+                                            Belum ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.
+                                        <?php } else { ?>
+                                            Belum ada kelas yang terdaftar pada tahun ajaran ini.
+                                        <?php } ?>
+
                                     </td>
                                 </tr>
 

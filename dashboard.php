@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -13,6 +14,7 @@ $halaman = 'dashboard';
 $nama_pengguna = htmlspecialchars($_SESSION['name'] ?? 'Pengguna');
 $role_pengguna = $_SESSION['role'] ?? '';
 $email_login = $_SESSION['email'] ?? '';
+$user_id = $_SESSION['id'] ?? 0;
 
 if ($role_pengguna == 'admin') {
     $label_role = 'Admin';
@@ -20,42 +22,196 @@ if ($role_pengguna == 'admin') {
     $label_role = 'Guru / Petugas';
 }
 
-// CEK APAKAH GURU INI ADALAH WALI KELAS (BERDASARKAN TABEL t_wali_kelas)
+// CEK APAKAH PENGGUNA MERUPAKAN WALI KELAS AKTIF
+$wali_kelas_aktif = false;
+$daftar_kelas_wali = [];
 $nama_kelas_wali = '';
-if ($role_pengguna != 'admin') {
-    $query_wali = mysqli_query($koneksi, "
-        SELECT k.nama AS nama_kelas 
-        FROM t_wali_kelas tw
-        JOIN t_guru g ON tw.guru_id = g.id
-        JOIN t_kelas k ON tw.kelas_id = k.id
-        WHERE g.email = '$email_login' AND k.status_aktif = 1
+
+if ($role_pengguna == 'petugas') {
+
+    $stmt_wali = mysqli_prepare($koneksi, "
+        SELECT DISTINCT
+            wk.kelas_id,
+            wk.tahun_ajaran_id,
+            k.nama AS nama_kelas
+        FROM t_wali_kelas wk
+        INNER JOIN t_guru g ON wk.guru_id = g.id
+        INNER JOIN t_kelas k ON wk.kelas_id = k.id
+        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+        WHERE g.user_id = ?
+          AND g.status_aktif = 1
+          AND wk.status_aktif = 1
+          AND k.status_aktif = 1
+          AND ta.status_aktif = 1
+        ORDER BY k.nama ASC
     ");
-    
-    if ($query_wali && mysqli_num_rows($query_wali) > 0) {
-        $data_wali = mysqli_fetch_assoc($query_wali);
-        $nama_kelas_wali = $data_wali['nama_kelas'];
+
+    mysqli_stmt_bind_param($stmt_wali, "i", $user_id);
+    mysqli_stmt_execute($stmt_wali);
+
+    $hasil_wali = mysqli_stmt_get_result($stmt_wali);
+
+    while ($data_wali = mysqli_fetch_assoc($hasil_wali)) {
+        $daftar_kelas_wali[] = $data_wali;
+    }
+
+    mysqli_stmt_close($stmt_wali);
+
+    if (count($daftar_kelas_wali) > 0) {
+        $wali_kelas_aktif = true;
+
+        $nama_kelas = array_column($daftar_kelas_wali, 'nama_kelas');
+        $nama_kelas_wali = implode(', ', array_unique($nama_kelas));
     }
 }
 
-// MENGAMBIL TOTAL DATA UNTUK KARTU STATISTIK
-$q_siswa = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_siswa WHERE status_aktif = 1");
-$total_siswa = mysqli_fetch_assoc($q_siswa)['total'] ?? 0;
+// MENGAMBIL TOTAL DATA SISWA
+if ($wali_kelas_aktif) {
 
-$q_guru = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_guru WHERE status_aktif = 1");
+    // WALI KELAS HANYA MENGHITUNG SISWA DI KELAS BINAANNYA
+    $stmt_siswa = mysqli_prepare($koneksi, "
+        SELECT COUNT(DISTINCT s.id) AS total
+        FROM t_siswa s
+        INNER JOIN t_kelas_siswa ks ON s.id = ks.siswa_id
+        INNER JOIN t_wali_kelas wk
+            ON ks.kelas_id = wk.kelas_id
+            AND ks.tahun_ajaran_id = wk.tahun_ajaran_id
+        INNER JOIN t_guru g ON wk.guru_id = g.id
+        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+        WHERE s.status_aktif = 1
+          AND ks.status_aktif = 1
+          AND g.user_id = ?
+          AND g.status_aktif = 1
+          AND wk.status_aktif = 1
+          AND ta.status_aktif = 1
+          AND ks.tanggal_mulai <= CURDATE()
+          AND (
+              ks.tanggal_selesai IS NULL
+              OR ks.tanggal_selesai = '0000-00-00'
+              OR ks.tanggal_selesai >= CURDATE()
+          )
+    ");
+
+    mysqli_stmt_bind_param($stmt_siswa, "i", $user_id);
+    mysqli_stmt_execute($stmt_siswa);
+
+    $hasil_siswa = mysqli_stmt_get_result($stmt_siswa);
+    $total_siswa = mysqli_fetch_assoc($hasil_siswa)['total'] ?? 0;
+
+    mysqli_stmt_close($stmt_siswa);
+
+} else {
+
+    // ADMIN DAN PETUGAS BIASA MELIHAT TOTAL SISWA AKTIF
+    $q_siswa = mysqli_query($koneksi, "
+        SELECT COUNT(*) AS total
+        FROM t_siswa
+        WHERE status_aktif = 1
+    ");
+
+    $total_siswa = mysqli_fetch_assoc($q_siswa)['total'] ?? 0;
+}
+
+// MENGAMBIL TOTAL DATA GURU
+$q_guru = mysqli_query($koneksi, "
+    SELECT COUNT(*) AS total
+    FROM t_guru
+    WHERE status_aktif = 1
+");
+
 $total_guru = mysqli_fetch_assoc($q_guru)['total'] ?? 0;
 
-$q_kelas = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_kelas WHERE status_aktif = 1");
-$total_kelas = mysqli_fetch_assoc($q_kelas)['total'] ?? 0;
+// MENGAMBIL TOTAL DATA KELAS
+if ($wali_kelas_aktif) {
 
-// MENGAMBIL DATA PELANGGARAN TERBARU UNTUK BAGIAN BAWAH
-$q_terbaru = mysqli_query($koneksi, "
-    SELECT ps.tanggal, s.nama AS nama_siswa, k.nama AS nama_kelas, p.nama AS nama_pelanggaran, ps.poin 
-    FROM t_pelanggaran_siswa ps
-    JOIN t_siswa s ON ps.siswa_id = s.id
-    JOIN t_kelas k ON ps.kelas_id = k.id
-    JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
-    ORDER BY ps.id DESC LIMIT 5
-");
+    // WALI KELAS HANYA MENGHITUNG KELAS BINAANNYA
+    $stmt_kelas = mysqli_prepare($koneksi, "
+        SELECT COUNT(DISTINCT wk.kelas_id) AS total
+        FROM t_wali_kelas wk
+        INNER JOIN t_guru g ON wk.guru_id = g.id
+        INNER JOIN t_kelas k ON wk.kelas_id = k.id
+        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+        WHERE g.user_id = ?
+          AND g.status_aktif = 1
+          AND wk.status_aktif = 1
+          AND k.status_aktif = 1
+          AND ta.status_aktif = 1
+    ");
+
+    mysqli_stmt_bind_param($stmt_kelas, "i", $user_id);
+    mysqli_stmt_execute($stmt_kelas);
+
+    $hasil_kelas = mysqli_stmt_get_result($stmt_kelas);
+    $total_kelas = mysqli_fetch_assoc($hasil_kelas)['total'] ?? 0;
+
+    mysqli_stmt_close($stmt_kelas);
+
+} else {
+
+    // ADMIN DAN PETUGAS BIASA MELIHAT TOTAL KELAS AKTIF
+    $q_kelas = mysqli_query($koneksi, "
+        SELECT COUNT(*) AS total
+        FROM t_kelas
+        WHERE status_aktif = 1
+    ");
+
+    $total_kelas = mysqli_fetch_assoc($q_kelas)['total'] ?? 0;
+}
+
+// MENGAMBIL DATA PELANGGARAN TERBARU
+if ($wali_kelas_aktif) {
+
+    // WALI KELAS HANYA MELIHAT PELANGGARAN KELAS BINAANNYA
+    $stmt_terbaru = mysqli_prepare($koneksi, "
+        SELECT
+            ps.tanggal,
+            s.nama AS nama_siswa,
+            k.nama AS nama_kelas,
+            p.nama AS nama_pelanggaran,
+            ps.poin
+        FROM t_pelanggaran_siswa ps
+        INNER JOIN t_siswa s ON ps.siswa_id = s.id
+        INNER JOIN t_kelas k ON ps.kelas_id = k.id
+        INNER JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
+        WHERE EXISTS (
+            SELECT 1
+            FROM t_wali_kelas wk
+            INNER JOIN t_guru g ON wk.guru_id = g.id
+            INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+            WHERE g.user_id = ?
+              AND g.status_aktif = 1
+              AND wk.status_aktif = 1
+              AND ta.status_aktif = 1
+              AND wk.kelas_id = ps.kelas_id
+              AND wk.tahun_ajaran_id = ps.tahun_ajaran_id
+        )
+        ORDER BY ps.id DESC
+        LIMIT 5
+    ");
+
+    mysqli_stmt_bind_param($stmt_terbaru, "i", $user_id);
+    mysqli_stmt_execute($stmt_terbaru);
+
+    $q_terbaru = mysqli_stmt_get_result($stmt_terbaru);
+
+} else {
+
+    // ADMIN DAN PETUGAS BIASA MELIHAT PELANGGARAN TERBARU SECARA GLOBAL
+    $q_terbaru = mysqli_query($koneksi, "
+        SELECT
+            ps.tanggal,
+            s.nama AS nama_siswa,
+            k.nama AS nama_kelas,
+            p.nama AS nama_pelanggaran,
+            ps.poin
+        FROM t_pelanggaran_siswa ps
+        INNER JOIN t_siswa s ON ps.siswa_id = s.id
+        INNER JOIN t_kelas k ON ps.kelas_id = k.id
+        INNER JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
+        ORDER BY ps.id DESC
+        LIMIT 5
+    ");
+}
 ?>
 
 <!DOCTYPE html>
@@ -64,10 +220,10 @@ $q_terbaru = mysqli_query($koneksi, "
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - SIPES</title>
-    
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -289,7 +445,7 @@ $q_terbaru = mysqli_query($koneksi, "
 
                 <span class="role-badge">
                     <?= htmlspecialchars($label_role) ?>
-                    <?php if (!empty($nama_kelas_wali)): ?>
+                    <?php if ($wali_kelas_aktif): ?>
                         | Wali Kelas <?= htmlspecialchars($nama_kelas_wali) ?>
                     <?php endif; ?>
                 </span>
@@ -299,8 +455,9 @@ $q_terbaru = mysqli_query($koneksi, "
                 <h3>Selamat datang, <?= $nama_pengguna ?>!</h3>
                 <p>
                     Anda login sebagai <?= htmlspecialchars($label_role) ?>.
-                    <?php if (!empty($nama_kelas_wali)): ?>
-                        Anda bertindak sebagai Wali Kelas untuk kelas <strong><?= htmlspecialchars($nama_kelas_wali) ?></strong>.
+                    <?php if ($wali_kelas_aktif): ?>
+                        Anda bertindak sebagai Wali Kelas untuk kelas
+                        <strong><?= htmlspecialchars($nama_kelas_wali) ?></strong>.
                     <?php endif; ?>
                     Selamat menggunakan sistem informasi pelanggaran siswa.
                 </p>
@@ -311,61 +468,84 @@ $q_terbaru = mysqli_query($koneksi, "
             <div class="row mb-4">
 
                 <!-- CARD DATA SISWA -->
-                <div class="col-md-4 mb-3">
+                <div class="<?= $role_pengguna == 'admin' ? 'col-md-4' : 'col-md-6' ?> mb-3">
                     <div class="card stat-card stat-card-siswa">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="stat-label">Data Siswa</span>
+                                <span class="stat-label">
+                                    <?= $wali_kelas_aktif ? 'Siswa Kelas Binaan' : 'Data Siswa' ?>
+                                </span>
                                 <div class="stat-icon icon-siswa">
                                     <i class="fas fa-user-graduate"></i>
                                 </div>
                             </div>
+
                             <h2 class="stat-number"><?= $total_siswa; ?></h2>
+
                             <div class="d-flex justify-content-between align-items-center mt-3">
-                                <small class="text-muted"><i class="fas fa-check-circle text-success me-1"></i> Terdaftar aktif</small>
-                                <a href="data_siswa.php" class="btn-teal">LIHAT DATA</a>
+                                <small class="text-muted">
+                                    <i class="fas fa-check-circle text-success me-1"></i>
+                                    <?= $wali_kelas_aktif ? 'Siswa aktif di kelas binaan' : 'Terdaftar aktif' ?>
+                                </small>
+
+                                <?php if ($role_pengguna == 'admin'): ?>
+                                    <a href="data_siswa.php" class="btn-teal">LIHAT DATA</a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- CARD DATA GURU -->
-                <div class="col-md-4 mb-3">
-                    <div class="card stat-card stat-card-guru">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="stat-label">Data Guru</span>
-                                <div class="stat-icon icon-guru">
-                                    <i class="fas fa-chalkboard-teacher"></i>
+                <!-- CARD DATA GURU: KHUSUS ADMIN -->
+                <?php if ($role_pengguna == 'admin'): ?>
+                    <div class="col-md-4 mb-3">
+                        <div class="card stat-card stat-card-guru">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="stat-label">Data Guru</span>
+                                    <div class="stat-icon icon-guru">
+                                        <i class="fas fa-chalkboard-teacher"></i>
+                                    </div>
+                                </div>
+
+                                <h2 class="stat-number"><?= $total_guru; ?></h2>
+
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-user-check text-info me-1"></i>
+                                        Pengajar aktif
+                                    </small>
+                                    <a href="data_guru.php" class="btn-teal">LIHAT DATA</a>
                                 </div>
                             </div>
-                            <h2 class="stat-number"><?= $total_guru; ?></h2>
-                            <div class="d-flex justify-content-between align-items-center mt-3">
-                                <?php if ($role_pengguna == 'admin') { ?>
-                                    <small class="text-muted"><i class="fas fa-user-check text-info me-1"></i> Pengajar aktif</small>
-                                    <a href="data_guru.php" class="btn-teal">LIHAT DATA</a>
-                                <?php } else { ?>
-                                    <span class="text-secondary small">Ringkasan data</span>
-                                <?php } ?>
-                            </div>
                         </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
                 <!-- CARD DATA KELAS -->
-                <div class="col-md-4 mb-3">
+                <div class="<?= $role_pengguna == 'admin' ? 'col-md-4' : 'col-md-6' ?> mb-3">
                     <div class="card stat-card stat-card-kelas">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="stat-label">Data Kelas</span>
+                                <span class="stat-label">
+                                    <?= $wali_kelas_aktif ? 'Kelas Binaan' : 'Data Kelas' ?>
+                                </span>
                                 <div class="stat-icon icon-kelas">
                                     <i class="fas fa-door-open"></i>
                                 </div>
                             </div>
+
                             <h2 class="stat-number"><?= $total_kelas; ?></h2>
+
                             <div class="d-flex justify-content-between align-items-center mt-3">
-                                <small class="text-muted"><i class="fas fa-school text-primary me-1"></i> Ruang & Jurusan</small>
-                                <a href="kelas.php" class="btn-teal">LIHAT DATA</a>
+                                <small class="text-muted">
+                                    <i class="fas fa-school text-primary me-1"></i>
+                                    <?= $wali_kelas_aktif ? 'Kelas yang ditugaskan' : 'Ruang & Jurusan' ?>
+                                </small>
+
+                                <?php if ($role_pengguna == 'admin'): ?>
+                                    <a href="kelas.php" class="btn-teal">LIHAT DATA</a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -379,7 +559,7 @@ $q_terbaru = mysqli_query($koneksi, "
                     <h5 class="section-title m-0">Aktivitas / Pelanggaran Terbaru</h5>
                     <a href="laporan.php" class="btn btn-sm btn-outline-secondary rounded-3">Lihat Semua</a>
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
@@ -399,12 +579,18 @@ $q_terbaru = mysqli_query($koneksi, "
                                         <td><strong><?= htmlspecialchars($row['nama_siswa']); ?></strong></td>
                                         <td><?= htmlspecialchars($row['nama_kelas']); ?></td>
                                         <td><?= htmlspecialchars($row['nama_pelanggaran']); ?></td>
-                                        <td class="text-center"><span class="badge bg-danger"><?= $row['poin']; ?> Poin</span></td>
+                                        <td class="text-center">
+                                            <span class="badge bg-danger">
+                                                <?= $row['poin']; ?> Poin
+                                            </span>
+                                        </td>
                                     </tr>
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-3">Belum ada catatan pelanggaran terbaru.</td>
+                                    <td colspan="5" class="text-center text-muted py-3">
+                                        Belum ada catatan pelanggaran terbaru.
+                                    </td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>

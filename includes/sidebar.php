@@ -1,7 +1,6 @@
-
 <?php
 $role = $_SESSION['role'] ?? '';
-$email_user = $_SESSION['email'] ?? '';
+$user_id = $_SESSION['id'] ?? 0;
 
 $is_admin = ($role === 'admin');
 $is_guru = ($role === 'petugas');
@@ -9,18 +8,23 @@ $is_guru = ($role === 'petugas');
 // Cek apakah guru yang login merupakan wali kelas aktif
 $is_wali_kelas = false;
 
-if ($is_guru && !empty($email_user)) {
+if ($is_guru && !empty($user_id)) {
     $stmt_cek_sidebar = mysqli_prepare($koneksi, "
         SELECT tw.id
         FROM t_wali_kelas tw
         JOIN t_guru g ON tw.guru_id = g.id
         JOIN t_kelas k ON tw.kelas_id = k.id
-        WHERE g.email = ? AND k.status_aktif = 1
+        JOIN t_tahun_ajaran ta ON tw.tahun_ajaran_id = ta.id
+        WHERE g.user_id = ?
+          AND g.status_aktif = 1
+          AND tw.status_aktif = 1
+          AND k.status_aktif = 1
+          AND ta.status_aktif = 1
         LIMIT 1
     ");
 
     if ($stmt_cek_sidebar) {
-        mysqli_stmt_bind_param($stmt_cek_sidebar, "s", $email_user);
+        mysqli_stmt_bind_param($stmt_cek_sidebar, "i", $user_id);
         mysqli_stmt_execute($stmt_cek_sidebar);
 
         $hasil_cek_sidebar = mysqli_stmt_get_result($stmt_cek_sidebar);

@@ -33,13 +33,41 @@ function kembaliWaliKelas($pesan)
     exit;
 }
 
+// FORMAT TANGGAL
+function formatTanggalWali($tanggal)
+{
+    if (
+        empty($tanggal) ||
+        $tanggal == '0000-00-00' ||
+        strtotime($tanggal) === false
+    ) {
+        return '-';
+    }
+
+    return date('d-m-Y', strtotime($tanggal));
+}
+
+// FORMAT NAMA KELAS AGAR TAMPIL KONSISTEN
+function formatNamaKelasWali($nama, $tingkat)
+{
+    $nama = trim($nama);
+    $tingkat = trim($tingkat);
+
+    // Hilangkan awalan tingkat jika sudah ada
+    if (preg_match('/^(XII|XI|X)\s+/i', $nama, $cocok)) {
+        $nama = trim(substr($nama, strlen($cocok[0])));
+    }
+
+    return trim($tingkat . ' ' . $nama);
+}
+
 /*
 |--------------------------------------------------------------------------
 | AMBIL DATA TAHUN AJARAN
 |--------------------------------------------------------------------------
 */
 
-// Hitung jumlah tahun ajaran aktif secara terpisah
+// Hitung jumlah tahun ajaran aktif
 $query_jumlah_tahun_aktif = mysqli_query(
     $koneksi,
     "SELECT COUNT(*) AS total
@@ -54,7 +82,7 @@ if (!$query_jumlah_tahun_aktif) {
 $hasil_jumlah_tahun = mysqli_fetch_assoc($query_jumlah_tahun_aktif);
 $jumlah_tahun_aktif = (int)$hasil_jumlah_tahun['total'];
 
-// Ambil data tahun ajaran aktif
+// Ambil tahun ajaran aktif
 $tahun_aktif_query = mysqli_query(
     $koneksi,
     "SELECT id, nama, tanggal_mulai, tanggal_selesai, status_aktif
@@ -217,7 +245,7 @@ if (isset($_POST['edit'])) {
     // AMBIL DATA TAHUN AJARAN YANG DIPILIH
     $stmt = mysqli_prepare(
         $koneksi,
-        "SELECT id, tanggal_mulai, tanggal_selesai
+        "SELECT id, tanggal_mulai, tanggal_selesai, status_aktif
          FROM t_tahun_ajaran
          WHERE id = ?"
     );
@@ -230,6 +258,18 @@ if (isset($_POST['edit'])) {
 
     if (!$data_tahun) {
         kembaliWaliKelas('Tahun ajaran tidak ditemukan.');
+    }
+
+    // PENUGASAN AKTIF HANYA BOLEH PADA TAHUN AJARAN AKTIF
+    if ($status_aktif == 1) {
+
+        if (
+            $jumlah_tahun_aktif !== 1 ||
+            (int)$data_tahun['status_aktif'] !== 1 ||
+            (int)$tahun_aktif['id'] !== $tahun_ajaran_id
+        ) {
+            kembaliWaliKelas('Penugasan pada tahun ajaran lama tidak dapat diaktifkan kembali. Gunakan tahun ajaran yang sedang aktif.');
+        }
     }
 
     // VALIDASI KELAS
@@ -398,7 +438,12 @@ if (isset($_GET['edit'])) {
 
     $stmt = mysqli_prepare(
         $koneksi,
-        "SELECT * FROM t_wali_kelas WHERE id = ?"
+        "SELECT
+            wk.*,
+            ta.status_aktif AS status_tahun_aktif
+         FROM t_wali_kelas wk
+         LEFT JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+         WHERE wk.id = ?"
     );
 
     mysqli_stmt_bind_param($stmt, "i", $id);
@@ -478,7 +523,8 @@ $data_wali = mysqli_query(
         k.tingkat,
         k.jurusan,
         g.nama AS nama_guru,
-        ta.nama AS tahun_ajaran
+        ta.nama AS tahun_ajaran,
+        ta.status_aktif AS status_tahun_aktif
     FROM t_wali_kelas wk
     JOIN t_kelas k ON wk.kelas_id = k.id
     JOIN t_guru g ON wk.guru_id = g.id
@@ -493,11 +539,116 @@ if (!$data_wali) {
     die("Gagal mengambil data Wali Kelas: " . htmlspecialchars(mysqli_error($koneksi)));
 }
 
-// LIST KELAS DAN GURU
-$list_kelas = mysqli_query(
+/*
+|--------------------------------------------------------------------------
+| LIST KELAS DAN GURU
+|--------------------------------------------------------------------------
+*/
+
+// LIST KELAS UNTUK EDIT
+// Satu kelas ditampilkan untuk setiap kombinasi nama,
+// tingkat, dan jurusan.
+// ID kelas yang sedang diedit tetap dimasukkan agar
+// riwayat penugasan lama tetap dapat ditampilkan.
+
+$id_kelas_edit = $data_edit ? (int)$data_edit['kelas_id'] : 0;
+
+$stmt = mysqli_prepare(
     $koneksi,
-    "SELECT * FROM t_kelas ORDER BY nama ASC"
+    "SELECT k.*
+     FROM t_kelas k
+     WHERE
+        k.id = ?
+
+        OR NOT EXISTS (
+            SELECT 1
+            FROM t_kelas k2
+            WHERE
+                k2.tingkat = k.tingkat
+                AND TRIM(k2.jurusan) = TRIM(k.jurusan)
+                AND TRIM(k2.nama) = TRIM(k.nama)
+                AND k2.id < k.id
+        )
+
+     ORDER BY
+        FIELD(k.tingkat, 'X', 'XI', 'XII'),
+        k.jurusan ASC,
+        k.nama ASC"
 );
+
+if (!$stmt) {
+    die("Gagal menyiapkan daftar kelas edit: " . htmlspecialchars(mysqli_error($koneksi)));
+}
+
+mysqli_stmt_bind_param(
+    $stmt,
+    "i",
+    $id_kelas_edit
+);
+
+mysqli_stmt_execute($stmt);
+$list_kelas = mysqli_stmt_get_result($stmt);
+
+// LIST KELAS UNTUK TAMBAH
+// Menggunakan kelas lama tanpa menampilkan duplikat.
+// Kelas yang sudah memiliki wali kelas aktif pada
+// tahun ajaran sekarang tidak ditampilkan.
+
+if ($tahun_aktif) {
+
+    $tahun_id_dropdown = (int)$tahun_aktif['id'];
+
+    $stmt = mysqli_prepare(
+        $koneksi,
+        "SELECT k.*
+         FROM t_kelas k
+
+         WHERE k.status_aktif = 1
+
+         AND NOT EXISTS (
+             SELECT 1
+             FROM t_wali_kelas wk
+             WHERE wk.kelas_id = k.id
+             AND wk.tahun_ajaran_id = ?
+             AND wk.status_aktif = 1
+         )
+
+         AND NOT EXISTS (
+             SELECT 1
+             FROM t_kelas k2
+             WHERE
+                 k2.tingkat = k.tingkat
+                 AND TRIM(k2.jurusan) = TRIM(k.jurusan)
+                 AND TRIM(k2.nama) = TRIM(k.nama)
+                 AND k2.id < k.id
+         )
+
+         ORDER BY
+             FIELD(k.tingkat, 'X', 'XI', 'XII'),
+             k.jurusan ASC,
+             k.nama ASC"
+    );
+
+    if (!$stmt) {
+        die("Gagal menyiapkan daftar kelas tambah: " . htmlspecialchars(mysqli_error($koneksi)));
+    }
+
+    mysqli_stmt_bind_param(
+        $stmt,
+        "i",
+        $tahun_id_dropdown
+    );
+
+    mysqli_stmt_execute($stmt);
+    $list_kelas_tambah = mysqli_stmt_get_result($stmt);
+
+} else {
+
+    $list_kelas_tambah = mysqli_query(
+        $koneksi,
+        "SELECT * FROM t_kelas WHERE 1 = 0"
+    );
+}
 
 $list_guru = mysqli_query(
     $koneksi,
@@ -721,6 +872,11 @@ $list_tahun_edit = mysqli_query(
             background: #fff0dc;
         }
 
+        .status-history {
+            color: #536078;
+            background: #edf0f5;
+        }
+
         .table-count {
             color: var(--text-muted);
             font-size: 13px;
@@ -798,6 +954,12 @@ $list_tahun_edit = mysqli_query(
                             Perbarui tahun ajaran, guru, kelas, atau status penugasan.
                         </p>
 
+                        <?php if ((int)$data_edit['status_tahun_aktif'] !== 1) { ?>
+                            <div class="alert alert-secondary">
+                                Data ini berasal dari tahun ajaran lama. Data tetap tersimpan sebagai riwayat dan tidak dapat diaktifkan kembali.
+                            </div>
+                        <?php } ?>
+
                         <form method="POST">
 
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token); ?>">
@@ -838,7 +1000,7 @@ $list_tahun_edit = mysqli_query(
                                                 <?= ($data_edit['kelas_id'] == $k['id']) ? 'selected' : ''; ?>
                                                 <?= ($k['status_aktif'] != 1 && $data_edit['kelas_id'] != $k['id']) ? 'disabled' : ''; ?>
                                             >
-                                                <?= htmlspecialchars($k['nama']); ?>
+                                                <?= htmlspecialchars(formatNamaKelasWali($k['nama'], $k['tingkat'])); ?>
                                                 <?= ($k['status_aktif'] != 1) ? '(Tidak Aktif)' : ''; ?>
                                             </option>
 
@@ -871,13 +1033,22 @@ $list_tahun_edit = mysqli_query(
                                     <label class="form-label">Status Aktif</label>
 
                                     <select class="form-select" name="status_aktif" required>
-                                        <option value="1" <?= ($data_edit['status_aktif'] == 1) ? 'selected' : ''; ?>>
-                                            Aktif
-                                        </option>
 
-                                        <option value="0" <?= ($data_edit['status_aktif'] == 0) ? 'selected' : ''; ?>>
+                                        <?php if ((int)$data_edit['status_tahun_aktif'] === 1) { ?>
+
+                                            <option value="1" <?= ($data_edit['status_aktif'] == 1) ? 'selected' : ''; ?>>
+                                                Aktif
+                                            </option>
+
+                                        <?php } ?>
+
+                                        <option value="0" <?= (
+                                            $data_edit['status_aktif'] == 0 ||
+                                            (int)$data_edit['status_tahun_aktif'] !== 1
+                                        ) ? 'selected' : ''; ?>>
                                             Tidak Aktif
                                         </option>
+
                                     </select>
                                 </div>
 
@@ -885,9 +1056,9 @@ $list_tahun_edit = mysqli_query(
                                     <label class="form-label">Periode Penugasan</label>
 
                                     <div class="info-periode">
-                                        <?= htmlspecialchars($data_edit['tanggal_mulai']); ?>
+                                        <?= htmlspecialchars(formatTanggalWali($data_edit['tanggal_mulai'])); ?>
                                         sampai
-                                        <?= htmlspecialchars($data_edit['tanggal_selesai']); ?>
+                                        <?= htmlspecialchars(formatTanggalWali($data_edit['tanggal_selesai'])); ?>
                                     </div>
 
                                     <small class="text-muted">
@@ -940,23 +1111,22 @@ $list_tahun_edit = mysqli_query(
                                         <select class="form-select" name="kelas_id" required>
                                             <option value="">-- Pilih Kelas --</option>
 
-                                            <?php
-                                            mysqli_data_seek($list_kelas, 0);
-
-                                            while ($k = mysqli_fetch_assoc($list_kelas)) {
-
-                                                if ($k['status_aktif'] == 1) {
-                                            ?>
+                                            <?php while ($k = mysqli_fetch_assoc($list_kelas_tambah)) { ?>
 
                                                 <option value="<?= (int)$k['id']; ?>">
-                                                    <?= htmlspecialchars($k['nama']); ?>
+                                                    <?= htmlspecialchars(formatNamaKelasWali($k['nama'], $k['tingkat'])); ?>
                                                 </option>
 
-                                            <?php
-                                                }
-                                            }
-                                            ?>
+                                            <?php } ?>
+
                                         </select>
+
+                                        <?php if (mysqli_num_rows($list_kelas_tambah) === 0) { ?>
+                                            <small class="text-muted">
+                                                Belum ada kelas yang tersedia untuk penugasan pada tahun ajaran aktif.
+                                            </small>
+                                        <?php } ?>
+
                                     </div>
 
                                     <div class="col-md-4">
@@ -997,9 +1167,9 @@ $list_tahun_edit = mysqli_query(
                                         <label class="form-label">Periode Penugasan</label>
 
                                         <div class="info-periode">
-                                            <?= date('d-m-Y', strtotime($tahun_aktif['tanggal_mulai'])); ?>
+                                            <?= htmlspecialchars(formatTanggalWali($tahun_aktif['tanggal_mulai'])); ?>
                                             sampai
-                                            <?= date('d-m-Y', strtotime($tahun_aktif['tanggal_selesai'])); ?>
+                                            <?= htmlspecialchars(formatTanggalWali($tahun_aktif['tanggal_selesai'])); ?>
                                         </div>
 
                                         <small class="text-muted">
@@ -1125,7 +1295,7 @@ $list_tahun_edit = mysqli_query(
                                         </td>
 
                                         <td>
-                                            <?= htmlspecialchars($d['tingkat'] . ' ' . $d['jurusan']); ?>
+                                            <?= htmlspecialchars($d['tingkat'] . ' ' . trim($d['jurusan'])); ?>
                                         </td>
 
                                         <td>
@@ -1137,28 +1307,34 @@ $list_tahun_edit = mysqli_query(
                                         </td>
 
                                         <td>
-                                            <?= htmlspecialchars(date('d-m-Y', strtotime($d['tanggal_mulai']))); ?>
+                                            <?= htmlspecialchars(formatTanggalWali($d['tanggal_mulai'])); ?>
 
                                             <br>
 
                                             <small class="text-muted">
                                                 s.d.
-                                                <?= htmlspecialchars(date('d-m-Y', strtotime($d['tanggal_selesai']))); ?>
+                                                <?= htmlspecialchars(formatTanggalWali($d['tanggal_selesai'])); ?>
                                             </small>
                                         </td>
 
                                         <td>
 
-                                            <?php if ($d['status_aktif'] == 1) { ?>
+                                            <?php if ((int)$d['status_aktif'] === 0) { ?>
 
-                                                <span class="status-badge status-active">
-                                                    Aktif
+                                                <span class="status-badge status-inactive">
+                                                    Tidak Aktif
+                                                </span>
+
+                                            <?php } elseif ((int)$d['status_tahun_aktif'] !== 1) { ?>
+
+                                                <span class="status-badge status-history">
+                                                    Riwayat
                                                 </span>
 
                                             <?php } else { ?>
 
-                                                <span class="status-badge status-inactive">
-                                                    Tidak Aktif
+                                                <span class="status-badge status-active">
+                                                    Aktif
                                                 </span>
 
                                             <?php } ?>
@@ -1176,7 +1352,10 @@ $list_tahun_edit = mysqli_query(
                                                     Edit
                                                 </a>
 
-                                                <?php if ($d['status_aktif'] == 1) { ?>
+                                                <?php if (
+                                                    (int)$d['status_aktif'] === 1 &&
+                                                    (int)$d['status_tahun_aktif'] === 1
+                                                ) { ?>
 
                                                     <form
                                                         method="POST"

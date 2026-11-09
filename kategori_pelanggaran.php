@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -402,19 +403,19 @@ $query = mysqli_query(
             </div>
 
             <div class="card-body-custom">
-                <form method="POST" action="<?= $data_edit ? 'kategori_pelanggaran.php?edit=' . (int) $data_edit['id'] : 'kategori_pelanggaran.php'; ?>">
+                <form method="POST" autocomplete="off" action="<?= $data_edit ? 'kategori_pelanggaran.php?edit=' . (int) $data_edit['id'] : 'kategori_pelanggaran.php'; ?>">
                     <?php if ($data_edit): ?>
                         <input type="hidden" name="id" value="<?= (int) $data_edit['id']; ?>">
                     <?php endif; ?>
 
                     <div class="mb-3">
                         <label for="nama" class="form-label">Nama Kategori</label>
-                        <input type="text" id="nama" name="nama" class="form-control" maxlength="100" placeholder="Masukkan nama kategori" value="<?= htmlspecialchars($data_edit['nama'] ?? ''); ?>" required>
+                        <input type="text" id="nama" name="nama" class="form-control" maxlength="100" placeholder="Masukkan nama kategori" value="<?= htmlspecialchars($data_edit['nama'] ?? ''); ?>" autocomplete="off" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="deskripsi" class="form-label">Deskripsi</label>
-                        <textarea id="deskripsi" name="deskripsi" class="form-control" rows="3" placeholder="Masukkan deskripsi kategori"><?= htmlspecialchars($data_edit['deskripsi'] ?? ''); ?></textarea>
+                        <textarea id="deskripsi" name="deskripsi" class="form-control" rows="3" placeholder="Masukkan deskripsi kategori" autocomplete="off"><?= htmlspecialchars($data_edit['deskripsi'] ?? ''); ?></textarea>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 mt-4">

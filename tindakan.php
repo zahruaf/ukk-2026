@@ -16,62 +16,44 @@ $role = $_SESSION['role'] ?? '';
 $user_id_login = (int)($_SESSION['id'] ?? 0);
 
 // HAK AKSES
-// Admin dan Petugas dapat mengelola tindakan.
-// Petugas yang menjadi Wali Kelas dibatasi berdasarkan kelas binaannya.
-$boleh_edit = in_array($role, ['admin', 'petugas'], true);
-$role_wali_kelas = false;
+// Hanya Guru/Petugas yang dapat mengakses halaman Tindakan.
+// Admin tidak memiliki akses ke halaman ini.
 
-// CEK APAKAH PETUGAS SEDANG MENJADI WALI KELAS AKTIF
-if ($role === 'petugas') {
-
-    $sql_cek_wali = "
-        SELECT 1
-        FROM t_wali_kelas wk
-        INNER JOIN t_guru g ON wk.guru_id = g.id
-        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
-        WHERE g.user_id = ?
-          AND wk.status_aktif = 1
-          AND ta.status_aktif = 1
-        LIMIT 1
-    ";
-
-    $stmt_cek_wali = mysqli_prepare($koneksi, $sql_cek_wali);
-
-    // Jika pengecekan gagal, gunakan pembatasan akses sebagai langkah aman.
-    if (!$stmt_cek_wali) {
-
-        $role_wali_kelas = true;
-
-    } else {
-
-        mysqli_stmt_bind_param(
-            $stmt_cek_wali,
-            "i",
-            $user_id_login
-        );
-
-        mysqli_stmt_execute($stmt_cek_wali);
-
-        $result_cek_wali = mysqli_stmt_get_result($stmt_cek_wali);
-
-        if ($result_cek_wali && mysqli_num_rows($result_cek_wali) > 0) {
-            $role_wali_kelas = true;
-        }
-
-        mysqli_stmt_close($stmt_cek_wali);
-    }
+if ($role !== 'petugas') {
+    header("Location: dashboard.php");
+    exit;
 }
 
-// SUBQUERY FILTER KELAS BINAAN WALI KELAS
-$sql_filter_wali_kelas = "
-    ps.kelas_id IN (
-        SELECT wk.kelas_id
-        FROM t_wali_kelas wk
-        INNER JOIN t_guru g ON wk.guru_id = g.id
-        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
-        WHERE g.user_id = ?
-          AND wk.status_aktif = 1
-          AND ta.status_aktif = 1
+$boleh_edit = true;
+
+// FILTER HAK AKSES PETUGAS
+// 1. Pelanggaran yang dicatat oleh Guru/Petugas sendiri.
+// 2. Pelanggaran siswa di kelas binaannya pada tahun ajaran aktif.
+// Kedua hak akses digabungkan menggunakan OR.
+
+$sql_filter_petugas = "
+    (
+        ps.guru_id IN (
+            SELECT g.id
+            FROM t_guru g
+            WHERE g.user_id = ?
+              AND g.status_aktif = 1
+        )
+
+        OR EXISTS (
+            SELECT 1
+            FROM t_wali_kelas wk
+            INNER JOIN t_guru g ON wk.guru_id = g.id
+            INNER JOIN t_kelas k ON wk.kelas_id = k.id
+            INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+            WHERE g.user_id = ?
+              AND g.status_aktif = 1
+              AND wk.status_aktif = 1
+              AND k.status_aktif = 1
+              AND ta.status_aktif = 1
+              AND wk.kelas_id = ps.kelas_id
+              AND wk.tahun_ajaran_id = ps.tahun_ajaran_id
+        )
     )
 ";
 
@@ -123,69 +105,43 @@ if (isset($_POST['update_tindakan'])) {
         exit;
     }
 
-    // KHUSUS PETUGAS YANG MENJADI WALI KELAS
-    // PASTIKAN DATA BERASAL DARI KELAS BINAANNYA
-    if ($role_wali_kelas) {
+    // PETUGAS HANYA DAPAT UPDATE DATA SESUAI HAK AKSESNYA.
+    // Hak akses diperiksa kembali saat proses UPDATE.
 
-        $sql_cek_akses = "
-            SELECT ps.id
-            FROM t_pelanggaran_siswa ps
-            WHERE ps.id = ?
-              AND " . $sql_filter_wali_kelas;
+    $sql_update = "
+        UPDATE t_pelanggaran_siswa AS ps
+        SET tindakan = ?, status = ?
+        WHERE ps.id = ?
+          AND " . $sql_filter_petugas;
 
-        $stmt_cek_akses = mysqli_prepare($koneksi, $sql_cek_akses);
-
-        if (!$stmt_cek_akses) {
-            header("Location: tindakan.php?pesan=gagal");
-            exit;
-        }
-
-        mysqli_stmt_bind_param(
-            $stmt_cek_akses,
-            "ii",
-            $id,
-            $user_id_login
-        );
-
-        mysqli_stmt_execute($stmt_cek_akses);
-
-        $result_akses = mysqli_stmt_get_result($stmt_cek_akses);
-
-        $memiliki_akses = $result_akses && mysqli_num_rows($result_akses) > 0;
-
-        mysqli_stmt_close($stmt_cek_akses);
-
-        if (!$memiliki_akses) {
-            header("Location: tindakan.php?pesan=akses");
-            exit;
-        }
-    }
-
-    // UPDATE MENGGUNAKAN PREPARED STATEMENT
-    $stmt_update = mysqli_prepare(
-        $koneksi,
-        "UPDATE t_pelanggaran_siswa
-         SET tindakan = ?, status = ?
-         WHERE id = ?"
-    );
+    $stmt_update = mysqli_prepare($koneksi, $sql_update);
 
     if ($stmt_update) {
 
         mysqli_stmt_bind_param(
             $stmt_update,
-            "ssi",
+            "ssiii",
             $tindakan_baru,
             $status_baru,
-            $id
+            $id,
+            $user_id_login,
+            $user_id_login
         );
 
         $update = mysqli_stmt_execute($stmt_update);
 
+        $error_update = mysqli_stmt_error($stmt_update);
+
+        $jumlah_diubah = mysqli_stmt_affected_rows($stmt_update);
+
         mysqli_stmt_close($stmt_update);
 
-        if ($update) {
-            header("Location: tindakan.php?pesan=berhasil");
-            exit;
+        if ($update && $error_update === '') {
+
+            if ($jumlah_diubah >= 0) {
+                header("Location: tindakan.php?pesan=berhasil");
+                exit;
+            }
         }
     }
 
@@ -204,39 +160,42 @@ if (strlen($cari) > 100) {
 $sql = "
     SELECT
         ps.*,
-        COALESCE(NULLIF(ps.nama_siswa, ''), s.nama) AS nama_siswa_tampil,
-        COALESCE(NULLIF(ps.nama_kelas, ''), k.nama) AS nama_kelas_tampil,
-        COALESCE(NULLIF(ps.nama_pelanggaran, ''), p.nama) AS nama_pelanggaran_tampil,
-        COALESCE(NULLIF(ps.poin, ''), p.poin) AS poin_tampil,
+
+        COALESCE(
+            NULLIF(ps.nama_siswa, ''),
+            s.nama
+        ) AS nama_siswa_tampil,
+
+        COALESCE(
+            NULLIF(ps.nama_kelas, ''),
+            k.nama
+        ) AS nama_kelas_tampil,
+
+        COALESCE(
+            NULLIF(NULLIF(TRIM(ps.nama_pelanggaran), ''), '0'),
+            p.nama,
+            '-'
+        ) AS nama_pelanggaran_tampil,
+
+        COALESCE(
+            NULLIF(ps.poin, ''),
+            p.poin
+        ) AS poin_tampil,
+
         s.nis
+
     FROM t_pelanggaran_siswa ps
+
     LEFT JOIN t_siswa s ON ps.siswa_id = s.id
     LEFT JOIN t_kelas k ON ps.kelas_id = k.id
     LEFT JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
-";
 
-// FILTER BERDASARKAN ROLE
-if ($role_wali_kelas) {
+    WHERE " . $sql_filter_petugas;
 
-    $sql .= " WHERE " . $sql_filter_wali_kelas;
-
-    if ($cari !== '') {
-        $sql .= "
-            AND (
-                ps.nama_siswa LIKE ?
-                OR ps.nama_kelas LIKE ?
-                OR ps.nama_pelanggaran LIKE ?
-                OR ps.tindakan LIKE ?
-                OR ps.status LIKE ?
-                OR s.nis LIKE ?
-            )
-        ";
-    }
-
-} elseif ($cari !== '') {
-
+// FILTER PENCARIAN
+if ($cari !== '') {
     $sql .= "
-        WHERE (
+        AND (
             ps.nama_siswa LIKE ?
             OR ps.nama_kelas LIKE ?
             OR ps.nama_pelanggaran LIKE ?
@@ -252,16 +211,18 @@ $sql .= " ORDER BY ps.tanggal DESC, ps.id DESC";
 $stmt_data = mysqli_prepare($koneksi, $sql);
 
 $result = false;
+$gagal_ambil_data = false;
 
 if ($stmt_data) {
 
-    if ($role_wali_kelas && $cari !== '') {
+    if ($cari !== '') {
 
         $keyword = "%{$cari}%";
 
         mysqli_stmt_bind_param(
             $stmt_data,
-            "issssss",
+            "iissssss",
+            $user_id_login,
             $user_id_login,
             $keyword,
             $keyword,
@@ -271,33 +232,24 @@ if ($stmt_data) {
             $keyword
         );
 
-    } elseif ($role_wali_kelas) {
+    } else {
 
         mysqli_stmt_bind_param(
             $stmt_data,
-            "i",
+            "ii",
+            $user_id_login,
             $user_id_login
-        );
-
-    } elseif ($cari !== '') {
-
-        $keyword = "%{$cari}%";
-
-        mysqli_stmt_bind_param(
-            $stmt_data,
-            "ssssss",
-            $keyword,
-            $keyword,
-            $keyword,
-            $keyword,
-            $keyword,
-            $keyword
         );
     }
 
-    mysqli_stmt_execute($stmt_data);
+    if (mysqli_stmt_execute($stmt_data)) {
+        $result = mysqli_stmt_get_result($stmt_data);
+    } else {
+        $gagal_ambil_data = true;
+    }
 
-    $result = mysqli_stmt_get_result($stmt_data);
+} else {
+    $gagal_ambil_data = true;
 }
 
 $data_tindakan = [];
@@ -315,7 +267,25 @@ if ($stmt_data) {
 // FUNGSI ESCAPE OUTPUT
 function e($nilai)
 {
-    return htmlspecialchars((string)($nilai ?? ''), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars(
+        (string)($nilai ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+// FUNGSI FORMAT TANGGAL
+function formatTanggalTindakan($tanggal)
+{
+    if (
+        empty($tanggal) ||
+        $tanggal === '0000-00-00' ||
+        strtotime($tanggal) === false
+    ) {
+        return '-';
+    }
+
+    return date('d/m/Y', strtotime($tanggal));
 }
 
 ?>
@@ -439,6 +409,15 @@ function e($nilai)
 
         <?php endif; ?>
 
+        <!-- NOTIFIKASI JIKA QUERY GAGAL -->
+        <?php if ($gagal_ambil_data): ?>
+
+            <div class="alert alert-danger">
+                Gagal mengambil data tindakan. Silakan periksa koneksi database atau hubungi administrator.
+            </div>
+
+        <?php endif; ?>
+
         <!-- TABEL DATA TINDAKAN -->
         <div class="content-card">
 
@@ -518,7 +497,15 @@ function e($nilai)
 
                     <tbody>
 
-                        <?php if (count($data_tindakan) > 0): ?>
+                        <?php if ($gagal_ambil_data): ?>
+
+                            <tr>
+                                <td colspan="9" class="text-center text-danger py-4">
+                                    Data gagal dimuat.
+                                </td>
+                            </tr>
+
+                        <?php elseif (count($data_tindakan) > 0): ?>
 
                             <?php $no = 1; ?>
 
@@ -529,7 +516,7 @@ function e($nilai)
                                     <td><?= $no++; ?></td>
 
                                     <td>
-                                        <?= !empty($d['tanggal']) ? date('d/m/Y', strtotime($d['tanggal'])) : '-'; ?>
+                                        <?= e(formatTanggalTindakan($d['tanggal'])); ?>
                                     </td>
 
                                     <td>
@@ -621,7 +608,7 @@ function e($nilai)
         </div>
 
         <!-- MODAL EDIT DI LUAR TABEL -->
-        <?php if ($boleh_edit): ?>
+        <?php if ($boleh_edit && !$gagal_ambil_data): ?>
 
             <?php foreach ($data_tindakan as $d): ?>
 

@@ -10,7 +10,7 @@ if (!isset($_SESSION['login'])) {
 include 'config/koneksi.php';
 
 $halaman = 'rekap_wali_kelas';
-$email_login = $_SESSION['email'] ?? '';
+$user_id = $_SESSION['id'] ?? 0;
 $role_pengguna = $_SESSION['role'] ?? '';
 
 // 1. BATASI AKSES KHUSUS GURU / PETUGAS
@@ -22,18 +22,31 @@ if ($role_pengguna !== 'petugas') {
 // 2. CARI KELAS PERWALIAN DARI GURU YANG SEDANG LOGIN
 $kelas_id_wali = 0;
 $nama_kelas_wali = '';
+$tahun_ajaran_id_aktif = 0;
 
 $stmt_cek_wali = mysqli_prepare($koneksi, "
-    SELECT k.id AS kelas_id, k.nama AS nama_kelas
+    SELECT
+        k.id AS kelas_id,
+        k.nama AS nama_kelas,
+        ta.id AS tahun_ajaran_id
     FROM t_wali_kelas tw
-    JOIN t_guru g ON tw.guru_id = g.id
-    JOIN t_kelas k ON tw.kelas_id = k.id
-    WHERE g.email = ? AND k.status_aktif = 1
+    JOIN t_guru g
+        ON tw.guru_id = g.id
+    JOIN t_kelas k
+        ON tw.kelas_id = k.id
+    JOIN t_tahun_ajaran ta
+        ON tw.tahun_ajaran_id = ta.id
+    WHERE g.user_id = ?
+      AND g.status_aktif = 1
+      AND tw.status_aktif = 1
+      AND k.status_aktif = 1
+      AND ta.status_aktif = 1
+    ORDER BY tw.id DESC
     LIMIT 1
 ");
 
 if ($stmt_cek_wali) {
-    mysqli_stmt_bind_param($stmt_cek_wali, "s", $email_login);
+    mysqli_stmt_bind_param($stmt_cek_wali, "i", $user_id);
     mysqli_stmt_execute($stmt_cek_wali);
 
     $q_cek_wali = mysqli_stmt_get_result($stmt_cek_wali);
@@ -41,56 +54,65 @@ if ($stmt_cek_wali) {
     if ($q_cek_wali && mysqli_num_rows($q_cek_wali) > 0) {
         $data_wali = mysqli_fetch_assoc($q_cek_wali);
 
-        $kelas_id_wali = $data_wali['kelas_id'];
+        $kelas_id_wali = (int) $data_wali['kelas_id'];
         $nama_kelas_wali = $data_wali['nama_kelas'];
+        $tahun_ajaran_id_aktif = (int) $data_wali['tahun_ajaran_id'];
     }
 
     mysqli_stmt_close($stmt_cek_wali);
 }
 
 // 3. TOLAK AKSES JIKA BUKAN WALI KELAS AKTIF
-if ($kelas_id_wali <= 0) {
+if ($kelas_id_wali <= 0 || $tahun_ajaran_id_aktif <= 0) {
     header("Location: dashboard.php");
     exit;
 }
 
-// 4. AMBIL DATA SISWA MELALUI TABEL PENEMPATAN SISWA
+// 4. AMBIL DATA SISWA DAN REKAP POIN SESUAI KELAS
 $data_siswa_rekap = [];
 
-if ($kelas_id_wali > 0) {
+$stmt_rekap = mysqli_prepare($koneksi, "
+    SELECT
+        s.id,
+        s.nis,
+        s.nama,
+        COALESCE(SUM(ps.poin), 0) AS total_poin
+    FROM t_siswa s
+    JOIN t_kelas_siswa ks
+        ON ks.siswa_id = s.id
+        AND ks.kelas_id = ?
+        AND ks.tahun_ajaran_id = ?
+        AND ks.status_aktif = 1
+    LEFT JOIN t_pelanggaran_siswa ps
+        ON ps.siswa_id = s.id
+        AND ps.kelas_id = ?
+        AND ps.tahun_ajaran_id = ?
+    WHERE s.status_aktif = 1
+    GROUP BY s.id, s.nis, s.nama
+    ORDER BY total_poin DESC, s.nama ASC
+");
 
-    $stmt_rekap = mysqli_prepare($koneksi, "
-        SELECT
-            s.id,
-            s.nis,
-            s.nama,
-            COALESCE(SUM(ps.poin), 0) AS total_poin
-        FROM t_siswa s
-        JOIN t_kelas_siswa ks
-            ON ks.siswa_id = s.id
-            AND ks.kelas_id = ?
-            AND ks.status_aktif = 1
-        LEFT JOIN t_pelanggaran_siswa ps
-            ON s.id = ps.siswa_id
-        WHERE s.status_aktif = 1
-        GROUP BY s.id, s.nis, s.nama
-        ORDER BY total_poin DESC, s.nama ASC
-    ");
+if ($stmt_rekap) {
+    mysqli_stmt_bind_param(
+        $stmt_rekap,
+        "iiii",
+        $kelas_id_wali,
+        $tahun_ajaran_id_aktif,
+        $kelas_id_wali,
+        $tahun_ajaran_id_aktif
+    );
 
-    if ($stmt_rekap) {
-        mysqli_stmt_bind_param($stmt_rekap, "i", $kelas_id_wali);
-        mysqli_stmt_execute($stmt_rekap);
+    mysqli_stmt_execute($stmt_rekap);
 
-        $q_rekap = mysqli_stmt_get_result($stmt_rekap);
+    $q_rekap = mysqli_stmt_get_result($stmt_rekap);
 
-        if ($q_rekap) {
-            while ($row = mysqli_fetch_assoc($q_rekap)) {
-                $data_siswa_rekap[] = $row;
-            }
+    if ($q_rekap) {
+        while ($row = mysqli_fetch_assoc($q_rekap)) {
+            $data_siswa_rekap[] = $row;
         }
-
-        mysqli_stmt_close($stmt_rekap);
     }
+
+    mysqli_stmt_close($stmt_rekap);
 }
 ?>
 
@@ -248,7 +270,7 @@ if ($kelas_id_wali > 0) {
 
                                             <td class="text-center">
                                                 <span class="badge <?= $siswa['total_poin'] >= 50 ? 'badge-poin-tinggi' : ($siswa['total_poin'] > 20 ? 'badge-poin-waspada' : 'badge-poin-aman'); ?> p-2">
-                                                    <?= $siswa['total_poin']; ?> Poin
+                                                    <?= (int) $siswa['total_poin']; ?> Poin
                                                 </span>
                                             </td>
 

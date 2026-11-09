@@ -852,6 +852,7 @@ $query = mysqli_stmt_get_result($stmt_data);
                                     name="nama"
                                     class="form-control"
                                     maxlength="150"
+                                    autocomplete="off"
                                     value="<?php echo escapeJenisPelanggaran($data_edit['nama']); ?>"
                                     required>
                             </div>
@@ -934,6 +935,7 @@ $query = mysqli_stmt_get_result($stmt_data);
                                     name="nama"
                                     class="form-control"
                                     maxlength="150"
+                                    autocomplete="off"
                                     placeholder="Masukkan nama pelanggaran"
                                     required>
                             </div>
