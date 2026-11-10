@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -30,7 +31,9 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
             COALESCE(SUM(ps.poin), 0) AS total_poin,
             COUNT(ps.id) AS jumlah_pelanggaran
         FROM t_siswa s
-        LEFT JOIN t_pelanggaran_siswa ps ON s.id = ps.siswa_id
+        LEFT JOIN t_pelanggaran_siswa ps
+            ON s.id = ps.siswa_id
+            AND LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
         GROUP BY s.id, s.nis, s.nama
         ORDER BY total_poin DESC, s.nama ASC
     ");
@@ -79,6 +82,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
 }
 
 // QUERY REKAP POIN PER SISWA UNTUK TAMPILAN WEB
+// HANYA MENGHITUNG PELANGGARAN YANG STATUSNYA SELESAI
 $query = mysqli_query($koneksi, "
     SELECT
         s.id,
@@ -87,7 +91,9 @@ $query = mysqli_query($koneksi, "
         COALESCE(SUM(ps.poin), 0) AS total_poin,
         COUNT(ps.id) AS jumlah_pelanggaran
     FROM t_siswa s
-    LEFT JOIN t_pelanggaran_siswa ps ON s.id = ps.siswa_id
+    LEFT JOIN t_pelanggaran_siswa ps
+        ON s.id = ps.siswa_id
+        AND LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
     GROUP BY s.id, s.nis, s.nama
     ORDER BY total_poin DESC, s.nama ASC
 ");

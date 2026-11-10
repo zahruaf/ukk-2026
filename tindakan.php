@@ -190,7 +190,10 @@ $sql = "
     LEFT JOIN t_kelas k ON ps.kelas_id = k.id
     LEFT JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
 
-    WHERE " . $sql_filter_petugas;
+    WHERE " . $sql_filter_petugas . "
+
+    AND LOWER(TRIM(COALESCE(ps.status, ''))) <> 'selesai'
+";
 
 // FILTER PENCARIAN
 if ($cari !== '') {
