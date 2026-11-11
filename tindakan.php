@@ -573,7 +573,7 @@ function formatTanggalTindakan($tanggal)
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#editModal<?= (int)$d['id']; ?>"
                                             >
-                                                <i class="fas fa-pen"></i> Edit Tindakan
+                                                <i class="fas fa-pen"></i> Tindakan
                                             </button>
 
                                         <?php else: ?>

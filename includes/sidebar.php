@@ -1,4 +1,6 @@
+
 <?php
+
 $role = $_SESSION['role'] ?? '';
 $user_id = $_SESSION['id'] ?? 0;
 
@@ -9,6 +11,7 @@ $is_guru = ($role === 'petugas');
 $is_wali_kelas = false;
 
 if ($is_guru && !empty($user_id)) {
+
     $stmt_cek_sidebar = mysqli_prepare($koneksi, "
         SELECT tw.id
         FROM t_wali_kelas tw
@@ -36,6 +39,7 @@ if ($is_guru && !empty($user_id)) {
         mysqli_stmt_close($stmt_cek_sidebar);
     }
 }
+
 ?>
 
 <aside class="col-md-3 col-lg-2 p-3 position-fixed top-0 start-0 overflow-auto sidebar-app">
@@ -179,14 +183,18 @@ if ($is_guru && !empty($user_id)) {
 
         <?php endif; ?>
 
-        <!-- MENU LAPORAN SEMUA ROLE -->
-        <li class="nav-item">
-            <a href="laporan.php"
-               class="nav-link <?= ($halaman == 'laporan') ? 'active' : '' ?>">
-                <span class="menu-mark"><i class="fas fa-file-alt"></i></span>
-                Laporan
-            </a>
-        </li>
+        <!-- MENU LAPORAN ADMIN DAN WALI KELAS -->
+        <?php if ($is_admin || $is_wali_kelas): ?>
+
+            <li class="nav-item">
+                <a href="laporan.php"
+                   class="nav-link <?= ($halaman == 'laporan') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-file-alt"></i></span>
+                    Laporan
+                </a>
+            </li>
+
+        <?php endif; ?>
 
         <!-- ABOUT ADMIN -->
         <?php if ($is_admin): ?>

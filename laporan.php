@@ -48,7 +48,9 @@ if (isset($_POST['hapus_laporan'])) {
 
     $stmt_hapus = mysqli_prepare(
         $koneksi,
-        "DELETE FROM t_pelanggaran_siswa WHERE id = ?"
+        "DELETE FROM t_pelanggaran_siswa
+         WHERE id = ?
+         AND LOWER(TRIM(COALESCE(status, ''))) = 'selesai'"
     );
 
     if ($stmt_hapus) {
@@ -111,10 +113,11 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
         JOIN t_siswa s ON ps.siswa_id = s.id
         JOIN t_kelas k ON ps.kelas_id = k.id
         JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
+        WHERE LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
     ";
 
     if ($filter_aktif) {
-        $sql_export .= " WHERE ps.tanggal BETWEEN ? AND ?";
+        $sql_export .= " AND ps.tanggal BETWEEN ? AND ?";
     }
 
     $sql_export .= " ORDER BY ps.tanggal DESC";
@@ -178,10 +181,11 @@ $mulai = ($halaman_aktif - 1) * $batas;
 $sql_jml = "
     SELECT COUNT(*) AS total
     FROM t_pelanggaran_siswa ps
+    WHERE LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
 ";
 
 if ($filter_aktif) {
-    $sql_jml .= " WHERE ps.tanggal BETWEEN ? AND ?";
+    $sql_jml .= " AND ps.tanggal BETWEEN ? AND ?";
 }
 
 $stmt_jml = mysqli_prepare($koneksi, $sql_jml);
@@ -218,10 +222,11 @@ $sql = "
     JOIN t_siswa s ON ps.siswa_id = s.id
     JOIN t_kelas k ON ps.kelas_id = k.id
     JOIN t_pelanggaran p ON ps.pelanggaran_id = p.id
+    WHERE LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
 ";
 
 if ($filter_aktif) {
-    $sql .= " WHERE ps.tanggal BETWEEN ? AND ?";
+    $sql .= " AND ps.tanggal BETWEEN ? AND ?";
 }
 
 $sql .= " ORDER BY ps.tanggal DESC LIMIT ?, ?";

@@ -244,6 +244,7 @@ if ($stmt_rekap) {
                                     <th>Nama Siswa</th>
                                     <th class="text-center">Total Poin Pelanggaran</th>
                                     <th class="text-center">Status / Keterangan</th>
+                                    <th class="text-center">Aksi</th>
                                 </tr>
                             </thead>
 
@@ -300,6 +301,15 @@ if ($stmt_rekap) {
                                                 <?php endif; ?>
 
                                             </td>
+
+                                            <!-- TOMBOL DETAIL RIWAYAT PELANGGARAN -->
+                                            <td class="text-center">
+                                                <a href="detail_riwayat_pelanggaran.php?id=<?= (int) $siswa['id']; ?>"
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-eye me-1"></i>
+                                                    Detail
+                                                </a>
+                                            </td>
                                         </tr>
 
                                     <?php endforeach; ?>
@@ -307,7 +317,7 @@ if ($stmt_rekap) {
                                 <?php else: ?>
 
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">
+                                        <td colspan="6" class="text-center text-muted py-4">
                                             Belum ada data siswa terdaftar di kelas ini.
                                         </td>
                                     </tr>

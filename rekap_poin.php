@@ -1,5 +1,6 @@
 
 <?php
+
 session_start();
 
 if (!isset($_SESSION['login'])) {
@@ -15,69 +16,6 @@ $role = $_SESSION['role'] ?? '';
 // HANYA GURU (PETUGAS) YANG BOLEH MENGAKSES REKAP POIN
 if ($role !== 'petugas') {
     header("Location: dashboard.php");
-    exit;
-}
-
-// FITUR EXPORT EXCEL REKAP POIN
-if (isset($_GET['export']) && $_GET['export'] == 'excel') {
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=Rekap_Poin_Siswa_SIPES_" . date('Y-m-d') . ".xls");
-
-    $q_export = mysqli_query($koneksi, "
-        SELECT
-            s.id,
-            s.nis,
-            s.nama AS nama_siswa,
-            COALESCE(SUM(ps.poin), 0) AS total_poin,
-            COUNT(ps.id) AS jumlah_pelanggaran
-        FROM t_siswa s
-        LEFT JOIN t_pelanggaran_siswa ps
-            ON s.id = ps.siswa_id
-            AND LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
-        GROUP BY s.id, s.nis, s.nama
-        ORDER BY total_poin DESC, s.nama ASC
-    ");
-    ?>
-
-    <table border="1">
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>NIS</th>
-                <th>Nama Siswa</th>
-                <th>Jumlah Pelanggaran</th>
-                <th>Total Poin</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            <?php $no = 1; while ($row = mysqli_fetch_assoc($q_export)): ?>
-                <tr>
-                    <td><?= $no++; ?></td>
-                    <td>'<?= htmlspecialchars($row['nis'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?= htmlspecialchars($row['nama_siswa'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                    <td><?= $row['jumlah_pelanggaran']; ?> Kasus</td>
-                    <td><?= $row['total_poin']; ?></td>
-                    <td>
-                        <?php
-                        if ($row['total_poin'] == 0) {
-                            echo "Aman";
-                        } elseif ($row['total_poin'] < 25) {
-                            echo "Normal";
-                        } elseif ($row['total_poin'] < 50) {
-                            echo "Peringatan";
-                        } else {
-                            echo "Bahaya";
-                        }
-                        ?>
-                    </td>
-                </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
-
-    <?php
     exit;
 }
 
@@ -97,6 +35,7 @@ $query = mysqli_query($koneksi, "
     GROUP BY s.id, s.nis, s.nama
     ORDER BY total_poin DESC, s.nama ASC
 ");
+
 ?>
 
 <!DOCTYPE html>
@@ -138,25 +77,6 @@ $query = mysqli_query($koneksi, "
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
         }
 
-        /* Sembunyikan tombol dan sidebar saat dicetak */
-        @media print {
-            .no-print,
-            sidebar,
-            .main-content {
-                margin-left: 0 !important;
-                padding: 0 !important;
-            }
-
-            .no-print {
-                display: none !important;
-            }
-
-            .content-card {
-                border: none !important;
-                box-shadow: none !important;
-            }
-        }
-
         @media (max-width: 767.98px) {
             .main-content {
                 margin-left: 0;
@@ -168,57 +88,27 @@ $query = mysqli_query($koneksi, "
 
 <body>
 
-    <div class="no-print">
-        <?php include 'includes/sidebar.php'; ?>
-    </div>
+    <?php include 'includes/sidebar.php'; ?>
 
     <main class="main-content">
         <div class="container-fluid p-0">
 
-            <!-- HEADER & TOMBOL AKSI -->
-            <div class="d-flex justify-content-between align-items-center mb-4 no-print">
-                <div>
-                    <h2 class="fw-bold" style="color: var(--navy)">
-                        Riwayat & Rekap Poin Siswa
-                    </h2>
+            <!-- HEADER -->
+            <div class="mb-4">
+                <h2 class="fw-bold" style="color: var(--navy)">
+                    Riwayat & Rekap Poin Siswa
+                </h2>
 
-                    <p class="text-muted m-0">
-                        Pantau akumulasi poin, cetak laporan, atau unduh ke Excel.
-                    </p>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <a href="rekap_poin.php?export=excel" class="btn btn-success fw-bold rounded-3">
-                        📊 Export Excel
-                    </a>
-
-                    <button
-                        onclick="window.print()"
-                        class="btn btn-primary fw-bold rounded-3"
-                        style="background: var(--navy);"
-                    >
-                        🖨️ Cetak / Print PDF
-                    </button>
-                </div>
-            </div>
-
-            <!-- HEADER KHUSUS SAAT DICETAK -->
-            <div class="d-none d-print-block text-center mb-4">
-                <h3 class="fw-bold m-0">
-                    SISTEM INFORMASI PELANGGARAN SISWA (SIPES)
-                </h3>
-
-                <p class="m-0">
-                    Laporan Rekapitulasi Akumulasi Poin Pelanggaran Siswa
+                <p class="text-muted m-0">
+                    Pantau akumulasi poin pelanggaran siswa.
                 </p>
-
-                <hr>
             </div>
 
             <!-- TABEL REKAP POIN -->
             <div class="content-card">
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle">
+
                         <thead class="table-light">
                             <tr>
                                 <th>No</th>
@@ -301,6 +191,7 @@ $query = mysqli_query($koneksi, "
 
                             <?php endif; ?>
                         </tbody>
+
                     </table>
                 </div>
             </div>
