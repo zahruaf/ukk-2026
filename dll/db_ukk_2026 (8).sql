@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 09, 2026 at 06:41 PM
+-- Generation Time: Nov 11, 2026 at 06:39 PM
 -- Server version: 10.11.16-MariaDB
 -- PHP Version: 8.5.12
 
@@ -220,7 +220,26 @@ INSERT INTO `t_kelas` (`id`, `nama`, `tingkat`, `jurusan`, `status_aktif`, `crea
 (99, 'BD', 'XI', 'BD', 1, '2026-07-06 01:00:00', '2026-07-06 01:00:00'),
 (101, 'XII RPL 2', 'XII', 'RPL', 1, '2026-11-04 16:01:24', '2026-11-04 16:01:24'),
 (102, 'XII RPL 1', 'XII', 'RPL ', 1, '2026-11-04 16:01:43', '2026-11-04 16:01:43'),
-(103, 'XII TKJ 1', 'XII', 'TKJ', 1, '2026-11-09 17:04:30', '2026-11-09 17:04:30');
+(103, 'XII TKJ 1', 'XII', 'TKJ', 1, '2026-11-09 17:04:30', '2026-11-09 17:04:30'),
+(104, 'X BD', 'X', 'BD', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(105, 'X TSM 1', 'X', 'TSM', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(106, 'X TSM 2', 'X', 'TSM', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(107, 'X RPL 1', 'X', 'RPL', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(108, 'X RPL 2', 'X', 'RPL', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(109, 'X RPL 3', 'X', 'RPL', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(110, 'X TKJ 1', 'X', 'TKJ', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(111, 'X TKJ 2', 'X', 'TKJ', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(112, 'X TKJ 3', 'X', 'TKJ', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(113, 'X TKR 1', 'X', 'TKR', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(114, 'X TKR 2', 'X', 'TKR', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(115, 'X TKR 3', 'X', 'TKR', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(116, 'XII BD', 'XII', 'BD', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(117, 'XII TSM 1', 'XII', 'TSM', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(118, 'XII TSM 2', 'XII', 'TSM', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(119, 'XII TKJ 2', 'XII', 'TKJ', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(120, 'XII TKJ 3', 'XII', 'TKJ', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(121, 'XII TKR 1', 'XII', 'TKR', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00'),
+(122, 'XII TKR 2', 'XII', 'TKR', 1, '2026-11-09 17:42:00', '2026-11-09 17:42:00');
 
 -- --------------------------------------------------------
 
@@ -590,7 +609,8 @@ INSERT INTO `t_pelanggaran_kategori` (`id`, `nama`, `deskripsi`, `status_aktif`,
 (97, 'Kebersihan 10', 'Kategori pelanggaran nomor 97', 1, '2026-07-04 01:00:00', '2026-07-04 01:00:00'),
 (98, 'Keamanan 10', 'Kategori pelanggaran nomor 98', 1, '2026-07-05 01:00:00', '2026-07-05 01:00:00'),
 (99, 'Akademik 10', 'Kategori pelanggaran nomor 99', 1, '2026-07-06 01:00:00', '2026-07-06 01:00:00'),
-(100, 'Lingkungan 10', 'Kategori pelanggaran nomor 100', 1, '2026-07-07 01:00:00', '2026-07-07 01:00:00');
+(100, 'Lingkungan 10', 'Kategori pelanggaran nomor 100', 1, '2026-07-07 01:00:00', '2026-07-07 01:00:00'),
+(101, 'kedisiplinan', 'kategori pelanggaran no 101', 1, '2026-11-09 17:54:09', '2026-11-09 17:54:09');
 
 -- --------------------------------------------------------
 
@@ -624,9 +644,39 @@ CREATE TABLE `t_pelanggaran_siswa` (
 --
 
 INSERT INTO `t_pelanggaran_siswa` (`id`, `tahun_ajaran_id`, `siswa_id`, `nama_siswa`, `kelas_id`, `nama_kelas`, `pelanggaran_id`, `nama_pelanggaran`, `pelanggaran_kategori_id`, `guru_id`, `nama_guru`, `tanggal`, `keterangan`, `poin`, `tindakan`, `status`, `created_at`, `updated_at`) VALUES
-(101, 25, 150, 'TONI ANTONIO', 101, 'XII RPL 2', 11, '0', 11, 53, '0', '2026-11-09', 'terlambat kesekolah', 2, 'jangan terlambat lagi', 'tercatat', '2026-11-09 12:52:22', '2026-11-09 12:52:22'),
+(101, 25, 150, 'TONI ANTONIO', 101, 'XII RPL 2', 11, '0', 11, 53, '0', '2026-11-09', 'terlambat kesekolah', 2, 'Pembinaan oleh Wali Kelas', 'selesai', '2026-11-09 12:52:22', '2026-11-09 12:52:22'),
 (102, 25, 101, 'ALFIN RAHADIAN', 102, 'XII RPL 1', 11, '0', 11, 51, '0', '2026-11-09', 'telat', 2, 'jgn telat mulu', 'tercatat', '2026-11-09 16:10:32', '2026-11-09 16:10:32'),
-(103, 25, 127, 'ANISA AMIRULLA', 101, 'XII RPL 2', 143, '0', 5, 51, '0', '2026-11-09', 'gapake kemeja lab', 10, 'pake kemeja nya dong', 'tercatat', '2026-11-09 16:40:23', '2026-11-09 16:40:23');
+(104, 25, 130, 'FITRI NUR SYIAMI', 101, 'XII RPL 2', 103, '0', 1, 56, '0', '2026-11-11', 'keluar mapel pertama', 5, 'Pemanggilan Orang Tua / Wali Murid', 'tercatat', '2026-11-11 16:05:28', '2026-11-11 16:05:28'),
+(105, 25, 131, 'JUNITA PUTRI NUR RAHMAN', 101, 'XII RPL 2', 101, '0', 1, 56, '0', '2026-11-11', 'telat masuk 5mnt', 2, 'masuk tepat waktu', 'tercatat', '2026-11-11 16:11:04', '2026-11-11 16:11:04'),
+(106, 25, 150, 'TONI ANTONIO', 101, 'XII RPL 2', 101, '0', 1, 53, '0', '2026-11-11', 'telat 20 menit', 2, 'Pembinaan oleh Wali Kelas', 'selesai', '2026-11-11 16:20:50', '2026-11-11 16:20:50'),
+(107, 25, 127, 'ANISA AMIRULLA', 101, 'XII RPL 2', 115, '0', 6, 53, '0', '2026-11-11', 'berkata kasar didekat guru', 10, 'Pembinaan oleh Wali Kelas', 'selesai', '2026-11-11 16:50:26', '2026-11-11 16:50:26'),
+(108, 25, 112, 'MOZA DINA NABILLAH', 102, 'XII RPL 1', 129, '0', 9, 56, '0', '2026-11-12', 'tidak membawa buku b indo', 2, 'lain kali bawa bukunya', 'tercatat', '2026-11-11 17:07:44', '2026-11-11 17:07:44');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `t_riwayat_tindakan`
+--
+
+CREATE TABLE `t_riwayat_tindakan` (
+  `id` int(11) NOT NULL,
+  `pelanggaran_siswa_id` int(11) NOT NULL,
+  `penindak_id` int(11) NOT NULL,
+  `tindakan` varchar(150) NOT NULL,
+  `keterangan` text NOT NULL,
+  `tanggal_tindakan` datetime NOT NULL DEFAULT current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `t_riwayat_tindakan`
+--
+
+INSERT INTO `t_riwayat_tindakan` (`id`, `pelanggaran_siswa_id`, `penindak_id`, `tindakan`, `keterangan`, `tanggal_tindakan`, `created_at`) VALUES
+(1, 104, 107, 'Pemanggilan Orang Tua / Wali Murid', 'hasil tindakan', '2026-11-11 23:10:06', '2026-11-11 16:10:06'),
+(2, 104, 107, 'Pemanggilan Orang Tua / Wali Murid', 'yagitu', '2026-11-11 23:13:13', '2026-11-11 16:13:13'),
+(3, 106, 104, 'Pembinaan oleh Wali Kelas', 'dilakukannya pembinaan terhadap siswa tersebut', '2026-11-11 23:21:39', '2026-11-11 16:21:39'),
+(4, 107, 104, 'Pembinaan oleh Wali Kelas', 'hasil tindakan ini diarahkan untuk dilakukannya pembinaan oleh wakel', '2026-11-11 23:51:18', '2026-11-11 16:51:18');
 
 -- --------------------------------------------------------
 
@@ -1092,6 +1142,14 @@ ALTER TABLE `t_pelanggaran_siswa`
   ADD KEY `guru_id` (`guru_id`);
 
 --
+-- Indexes for table `t_riwayat_tindakan`
+--
+ALTER TABLE `t_riwayat_tindakan`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_pelanggaran_siswa` (`pelanggaran_siswa_id`),
+  ADD KEY `idx_penindak` (`penindak_id`);
+
+--
 -- Indexes for table `t_siswa`
 --
 ALTER TABLE `t_siswa`
@@ -1132,7 +1190,7 @@ ALTER TABLE `t_guru`
 -- AUTO_INCREMENT for table `t_kelas`
 --
 ALTER TABLE `t_kelas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=104;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=123;
 
 --
 -- AUTO_INCREMENT for table `t_kelas_siswa`
@@ -1144,19 +1202,25 @@ ALTER TABLE `t_kelas_siswa`
 -- AUTO_INCREMENT for table `t_pelanggaran`
 --
 ALTER TABLE `t_pelanggaran`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=164;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=150;
 
 --
 -- AUTO_INCREMENT for table `t_pelanggaran_kategori`
 --
 ALTER TABLE `t_pelanggaran_kategori`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=101;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=102;
 
 --
 -- AUTO_INCREMENT for table `t_pelanggaran_siswa`
 --
 ALTER TABLE `t_pelanggaran_siswa`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=104;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
+
+--
+-- AUTO_INCREMENT for table `t_riwayat_tindakan`
+--
+ALTER TABLE `t_riwayat_tindakan`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `t_siswa`
@@ -1216,6 +1280,13 @@ ALTER TABLE `t_pelanggaran_siswa`
   ADD CONSTRAINT `t_pelanggaran_siswa_ibfk_4` FOREIGN KEY (`pelanggaran_kategori_id`) REFERENCES `t_pelanggaran_kategori` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `t_pelanggaran_siswa_ibfk_5` FOREIGN KEY (`pelanggaran_id`) REFERENCES `t_pelanggaran` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `t_pelanggaran_siswa_ibfk_6` FOREIGN KEY (`siswa_id`) REFERENCES `t_siswa` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `t_riwayat_tindakan`
+--
+ALTER TABLE `t_riwayat_tindakan`
+  ADD CONSTRAINT `fk_riwayat_pelanggaran` FOREIGN KEY (`pelanggaran_siswa_id`) REFERENCES `t_pelanggaran_siswa` (`id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_riwayat_penindak` FOREIGN KEY (`penindak_id`) REFERENCES `t_users` (`id`) ON UPDATE CASCADE;
 
 --
 -- Constraints for table `t_wali_kelas`
