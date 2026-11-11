@@ -17,7 +17,6 @@ $user_id_login = (int)($_SESSION['id'] ?? 0);
 
 // HAK AKSES
 // Hanya Guru/Petugas yang dapat mengakses halaman Tindakan.
-// Admin tidak memiliki akses ke halaman ini.
 
 if ($role !== 'petugas') {
     header("Location: dashboard.php");
@@ -29,7 +28,6 @@ $boleh_edit = true;
 // FILTER HAK AKSES PETUGAS
 // 1. Pelanggaran yang dicatat oleh Guru/Petugas sendiri.
 // 2. Pelanggaran siswa di kelas binaannya pada tahun ajaran aktif.
-// Kedua hak akses digabungkan menggunakan OR.
 
 $sql_filter_petugas = "
     (
@@ -73,7 +71,7 @@ $daftar_tindakan = [
     'Skorsing'
 ];
 
-// PROSES UPDATE TINDAKAN
+// PROSES TAMBAH RIWAYAT TINDAKAN
 if (isset($_POST['update_tindakan'])) {
 
     if (!$boleh_edit) {
@@ -82,7 +80,8 @@ if (isset($_POST['update_tindakan'])) {
     }
 
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
-    $tindakan_baru = $_POST['tindakan'] ?? '';
+    $tindakan_baru = trim($_POST['tindakan'] ?? '');
+    $keterangan_baru = trim($_POST['keterangan'] ?? '');
     $status_baru = $_POST['status'] ?? '';
     $token_post = $_POST['csrf_token'] ?? '';
 
@@ -99,24 +98,105 @@ if (isset($_POST['update_tindakan'])) {
     if (
         !$id ||
         !in_array($tindakan_baru, $daftar_tindakan, true) ||
+        $keterangan_baru === '' ||
         !in_array($status_baru, ['tercatat', 'selesai'], true)
     ) {
         header("Location: tindakan.php?pesan=invalid");
         exit;
     }
 
-    // PETUGAS HANYA DAPAT UPDATE DATA SESUAI HAK AKSESNYA.
-    // Hak akses diperiksa kembali saat proses UPDATE.
+    // MULAI TRANSAKSI
+    mysqli_begin_transaction($koneksi);
 
-    $sql_update = "
-        UPDATE t_pelanggaran_siswa AS ps
-        SET tindakan = ?, status = ?
-        WHERE ps.id = ?
-          AND " . $sql_filter_petugas;
+    $berhasil = false;
 
-    $stmt_update = mysqli_prepare($koneksi, $sql_update);
+    try {
 
-    if ($stmt_update) {
+        // PERIKSA HAK AKSES DAN KUNCI DATA KASUS
+        $sql_periksa = "
+            SELECT ps.id
+            FROM t_pelanggaran_siswa AS ps
+            WHERE ps.id = ?
+              AND " . $sql_filter_petugas . "
+            FOR UPDATE
+        ";
+
+        $stmt_periksa = mysqli_prepare($koneksi, $sql_periksa);
+
+        if (!$stmt_periksa) {
+            throw new Exception("Gagal memeriksa hak akses.");
+        }
+
+        mysqli_stmt_bind_param(
+            $stmt_periksa,
+            "iii",
+            $id,
+            $user_id_login,
+            $user_id_login
+        );
+
+        if (!mysqli_stmt_execute($stmt_periksa)) {
+            mysqli_stmt_close($stmt_periksa);
+            throw new Exception("Gagal memeriksa data pelanggaran.");
+        }
+
+        $result_periksa = mysqli_stmt_get_result($stmt_periksa);
+        $data_periksa = mysqli_fetch_assoc($result_periksa);
+
+        mysqli_stmt_close($stmt_periksa);
+
+        if (!$data_periksa) {
+            throw new Exception("akses");
+        }
+
+        // SIMPAN RIWAYAT TINDAKAN BARU
+        // Setiap tindakan menghasilkan satu baris baru.
+        $sql_insert = "
+            INSERT INTO t_riwayat_tindakan (
+                pelanggaran_siswa_id,
+                penindak_id,
+                tindakan,
+                keterangan
+            ) VALUES (?, ?, ?, ?)
+        ";
+
+        $stmt_insert = mysqli_prepare($koneksi, $sql_insert);
+
+        if (!$stmt_insert) {
+            throw new Exception("Gagal menyiapkan penyimpanan riwayat.");
+        }
+
+        mysqli_stmt_bind_param(
+            $stmt_insert,
+            "iiss",
+            $id,
+            $user_id_login,
+            $tindakan_baru,
+            $keterangan_baru
+        );
+
+        if (!mysqli_stmt_execute($stmt_insert)) {
+            mysqli_stmt_close($stmt_insert);
+            throw new Exception("Gagal menyimpan riwayat tindakan.");
+        }
+
+        mysqli_stmt_close($stmt_insert);
+
+        // PERBARUI RINGKASAN TINDAKAN TERAKHIR DAN STATUS KASUS
+        // Kolom tindakan lama tetap dipertahankan untuk kompatibilitas.
+        $sql_update = "
+            UPDATE t_pelanggaran_siswa AS ps
+            SET
+                tindakan = ?,
+                status = ?
+            WHERE ps.id = ?
+              AND " . $sql_filter_petugas;
+
+        $stmt_update = mysqli_prepare($koneksi, $sql_update);
+
+        if (!$stmt_update) {
+            throw new Exception("Gagal menyiapkan pembaruan status.");
+        }
 
         mysqli_stmt_bind_param(
             $stmt_update,
@@ -128,21 +208,35 @@ if (isset($_POST['update_tindakan'])) {
             $user_id_login
         );
 
-        $update = mysqli_stmt_execute($stmt_update);
-
-        $error_update = mysqli_stmt_error($stmt_update);
-
-        $jumlah_diubah = mysqli_stmt_affected_rows($stmt_update);
+        if (!mysqli_stmt_execute($stmt_update)) {
+            mysqli_stmt_close($stmt_update);
+            throw new Exception("Gagal memperbarui status pelanggaran.");
+        }
 
         mysqli_stmt_close($stmt_update);
 
-        if ($update && $error_update === '') {
-
-            if ($jumlah_diubah >= 0) {
-                header("Location: tindakan.php?pesan=berhasil");
-                exit;
-            }
+        // SIMPAN SELURUH PERUBAHAN
+        if (!mysqli_commit($koneksi)) {
+            throw new Exception("Gagal menyimpan transaksi.");
         }
+
+        $berhasil = true;
+
+    } catch (Throwable $e) {
+
+        mysqli_rollback($koneksi);
+
+        if ($e->getMessage() === 'akses') {
+            header("Location: tindakan.php?pesan=akses");
+            exit;
+        }
+
+        error_log("Kesalahan tindakan SIPES: " . $e->getMessage());
+    }
+
+    if ($berhasil) {
+        header("Location: tindakan.php?pesan=berhasil");
+        exit;
     }
 
     header("Location: tindakan.php?pesan=gagal");
@@ -376,14 +470,14 @@ function formatTanggalTindakan($tanggal)
             <?php if ($_GET['pesan'] == 'berhasil'): ?>
 
                 <div class="alert alert-success alert-dismissible fade show">
-                    Tindakan berhasil diperbarui!
+                    Riwayat tindakan berhasil ditambahkan!
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
 
             <?php elseif ($_GET['pesan'] == 'gagal'): ?>
 
                 <div class="alert alert-danger alert-dismissible fade show">
-                    Gagal memperbarui tindakan!
+                    Gagal menyimpan riwayat tindakan!
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
 
@@ -404,7 +498,7 @@ function formatTanggalTindakan($tanggal)
             <?php elseif ($_GET['pesan'] == 'invalid'): ?>
 
                 <div class="alert alert-warning alert-dismissible fade show">
-                    Data yang dimasukkan tidak valid.
+                    Data yang dimasukkan tidak valid. Pastikan semua kolom telah diisi.
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
 
@@ -491,7 +585,7 @@ function formatTanggalTindakan($tanggal)
                             <th>Kelas</th>
                             <th>Pelanggaran</th>
                             <th>Poin</th>
-                            <th>Tindakan Saat Ini</th>
+                            <th>Tindakan Terakhir</th>
                             <th>Status</th>
                             <th class="text-center">Aksi</th>
                         </tr>
@@ -573,7 +667,7 @@ function formatTanggalTindakan($tanggal)
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#editModal<?= (int)$d['id']; ?>"
                                             >
-                                                <i class="fas fa-pen"></i> Tindakan
+                                                <i class="fas fa-pen"></i> Tambah Tindakan
                                             </button>
 
                                         <?php else: ?>
@@ -610,7 +704,7 @@ function formatTanggalTindakan($tanggal)
 
         </div>
 
-        <!-- MODAL EDIT DI LUAR TABEL -->
+        <!-- MODAL TAMBAH RIWAYAT TINDAKAN -->
         <?php if ($boleh_edit && !$gagal_ambil_data): ?>
 
             <?php foreach ($data_tindakan as $d): ?>
@@ -626,7 +720,7 @@ function formatTanggalTindakan($tanggal)
                                 <div class="modal-header">
 
                                     <h5 class="modal-title fw-bold">
-                                        Perbarui Tindakan Siswa
+                                        Tambah Riwayat Tindakan
                                     </h5>
 
                                     <button
@@ -707,6 +801,22 @@ function formatTanggalTindakan($tanggal)
                                     <div class="mb-3">
 
                                         <label class="form-label fw-bold">
+                                            Keterangan Tindakan
+                                        </label>
+
+                                        <textarea
+                                            name="keterangan"
+                                            class="form-control"
+                                            rows="3"
+                                            placeholder="Tuliskan keterangan atau hasil tindakan..."
+                                            required
+                                        ></textarea>
+
+                                    </div>
+
+                                    <div class="mb-3">
+
+                                        <label class="form-label fw-bold">
                                             Status Penanganan
                                         </label>
 
@@ -719,10 +829,7 @@ function formatTanggalTindakan($tanggal)
                                                 Tercatat (Proses)
                                             </option>
 
-                                            <option
-                                                value="selesai"
-                                                <?= ($d['status'] == 'selesai') ? 'selected' : ''; ?>
-                                            >
+                                            <option value="selesai">
                                                 Selesai
                                             </option>
 
@@ -748,7 +855,7 @@ function formatTanggalTindakan($tanggal)
                                         class="btn btn-teal text-white fw-bold"
                                         style="background: var(--teal);"
                                     >
-                                        Simpan Perubahan
+                                        Simpan Tindakan
                                     </button>
 
                                 </div>

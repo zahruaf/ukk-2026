@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -11,6 +10,54 @@ include 'config/koneksi.php';
 
 $halaman = 'laporan';
 $role = $_SESSION['role'] ?? '';
+
+// =====================================================
+// PEMERIKSAAN HAK AKSES HALAMAN LAPORAN
+// Admin dan Wali Kelas aktif yang boleh mengakses
+// =====================================================
+
+$boleh_akses_laporan = false;
+
+// Admin boleh mengakses laporan
+if ($role === 'admin') {
+    $boleh_akses_laporan = true;
+
+// Petugas hanya boleh jika juga merupakan Wali Kelas aktif
+} elseif ($role === 'petugas') {
+
+    $user_id_login = (int) ($_SESSION['id'] ?? 0);
+
+    $stmt_wali = mysqli_prepare($koneksi, "
+        SELECT COUNT(*) AS total
+        FROM t_wali_kelas wk
+        INNER JOIN t_guru g ON wk.guru_id = g.id
+        INNER JOIN t_tahun_ajaran ta ON wk.tahun_ajaran_id = ta.id
+        WHERE g.user_id = ?
+        AND g.status_aktif = 1
+        AND wk.status_aktif = 1
+        AND ta.status_aktif = 1
+    ");
+
+    if ($stmt_wali) {
+        mysqli_stmt_bind_param($stmt_wali, "i", $user_id_login);
+        mysqli_stmt_execute($stmt_wali);
+
+        $hasil_wali = mysqli_stmt_get_result($stmt_wali);
+        $data_wali = mysqli_fetch_assoc($hasil_wali);
+
+        if ((int) ($data_wali['total'] ?? 0) > 0) {
+            $boleh_akses_laporan = true;
+        }
+
+        mysqli_stmt_close($stmt_wali);
+    }
+}
+
+// Tolak akses Guru biasa dan role lainnya
+if (!$boleh_akses_laporan) {
+    header("Location: dashboard.php");
+    exit;
+}
 
 // TOKEN KEAMANAN UNTUK PROSES HAPUS
 if (empty($_SESSION['csrf_laporan'])) {
@@ -28,7 +75,7 @@ function tanggalValid($tanggal) {
 if (isset($_POST['hapus_laporan'])) {
 
     if ($role !== 'admin') {
-        header("Location: laporan.php");
+        header("Location: dashboard.php");
         exit;
     }
 
@@ -39,7 +86,10 @@ if (isset($_POST['hapus_laporan'])) {
         exit;
     }
 
-    $id_hapus = filter_var($_POST['id_laporan'] ?? '', FILTER_VALIDATE_INT);
+    $id_hapus = filter_var(
+        $_POST['id_laporan'] ?? '',
+        FILTER_VALIDATE_INT
+    );
 
     if ($id_hapus === false || $id_hapus === null || $id_hapus < 1) {
         header("Location: laporan.php?hapus=gagal");
@@ -54,14 +104,23 @@ if (isset($_POST['hapus_laporan'])) {
     );
 
     if ($stmt_hapus) {
+
         mysqli_stmt_bind_param($stmt_hapus, "i", $id_hapus);
+
         $berhasil = mysqli_stmt_execute($stmt_hapus);
         $terhapus = mysqli_stmt_affected_rows($stmt_hapus);
+        $error_hapus = mysqli_stmt_errno($stmt_hapus);
 
         mysqli_stmt_close($stmt_hapus);
 
         if ($berhasil && $terhapus > 0) {
             header("Location: laporan.php?hapus=berhasil");
+            exit;
+        }
+
+        // Data masih terhubung dengan riwayat tindakan
+        if (!$berhasil && $error_hapus === 1451) {
+            header("Location: laporan.php?hapus=terhubung");
             exit;
         }
     }
@@ -261,6 +320,7 @@ $query = mysqli_stmt_get_result($stmt);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laporan Pelanggaran - SIPES</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -498,15 +558,29 @@ $query = mysqli_stmt_get_result($stmt);
 
         <!-- NOTIFIKASI HAPUS -->
         <?php if (isset($_GET['hapus'])): ?>
+
             <?php if ($_GET['hapus'] == 'berhasil'): ?>
+
                 <div class="alert alert-success no-print">
                     Laporan berhasil dihapus.
                 </div>
-            <?php else: ?>
-                <div class="alert alert-danger no-print">
-                    Laporan gagal dihapus. Data mungkin masih terhubung dengan data lain.
+
+            <?php elseif ($_GET['hapus'] == 'terhubung'): ?>
+
+                <div class="alert alert-warning no-print">
+                    <strong>Laporan tidak dapat dihapus.</strong>
+                    Data pelanggaran masih memiliki riwayat tindakan.
+                    Riwayat penanganan tetap dipertahankan agar tidak kehilangan catatan.
                 </div>
+
+            <?php else: ?>
+
+                <div class="alert alert-danger no-print">
+                    Laporan gagal dihapus. Periksa kembali data atau hubungan database.
+                </div>
+
             <?php endif; ?>
+
         <?php endif; ?>
 
         <!-- HEADER KHUSUS HANYA SAAT CETAK PRINT -->

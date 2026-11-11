@@ -163,6 +163,61 @@ while ($row = mysqli_fetch_assoc($q_riwayat)) {
 
 mysqli_stmt_close($stmt_riwayat);
 
+// Ambil seluruh riwayat tindakan siswa
+// Query terpisah agar satu pelanggaran tidak menjadi beberapa baris
+$stmt_tindakan = mysqli_prepare($koneksi, "
+    SELECT
+        rt.pelanggaran_siswa_id,
+        rt.tindakan,
+        rt.keterangan,
+        rt.tanggal_tindakan,
+        u.name AS nama_penindak
+
+    FROM t_riwayat_tindakan rt
+
+    INNER JOIN t_pelanggaran_siswa ps
+        ON rt.pelanggaran_siswa_id = ps.id
+
+    LEFT JOIN t_users u
+        ON rt.penindak_id = u.id
+
+    WHERE ps.siswa_id = ?
+      AND ps.kelas_id = ?
+      AND ps.tahun_ajaran_id = ?
+
+    ORDER BY rt.tanggal_tindakan ASC, rt.id ASC
+");
+
+if (!$stmt_tindakan) {
+    die("Terjadi kesalahan saat mengambil riwayat tindakan.");
+}
+
+mysqli_stmt_bind_param(
+    $stmt_tindakan,
+    "iii",
+    $siswa_id,
+    $kelas_id_wali,
+    $tahun_ajaran_id_aktif
+);
+
+mysqli_stmt_execute($stmt_tindakan);
+$q_tindakan = mysqli_stmt_get_result($stmt_tindakan);
+
+// Kelompokkan tindakan berdasarkan ID pelanggaran
+$data_tindakan = [];
+
+while ($row_tindakan = mysqli_fetch_assoc($q_tindakan)) {
+    $id_pelanggaran = (int) $row_tindakan['pelanggaran_siswa_id'];
+
+    if (!isset($data_tindakan[$id_pelanggaran])) {
+        $data_tindakan[$id_pelanggaran] = [];
+    }
+
+    $data_tindakan[$id_pelanggaran][] = $row_tindakan;
+}
+
+mysqli_stmt_close($stmt_tindakan);
+
 // Total poin seluruh riwayat, sama seperti rekap kelas
 $total_poin = 0;
 
@@ -240,6 +295,40 @@ function e($nilai)
             color: var(--navy);
             font-size: 16px;
             font-weight: 700;
+        }
+
+        .riwayat-tindakan {
+            min-width: 220px;
+        }
+
+        .tindakan-item {
+            border-left: 3px solid var(--teal);
+            padding: 8px 0 8px 12px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .tindakan-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tindakan-nama {
+            font-weight: 700;
+            color: var(--navy);
+        }
+
+        .tindakan-meta {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .tindakan-keterangan {
+            font-size: 13px;
+            margin-top: 5px;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
         }
 
         @media (max-width: 767.98px) {
@@ -354,7 +443,7 @@ function e($nilai)
                                 <th class="text-center">Poin</th>
                                 <th>Keterangan</th>
                                 <th>Guru Pencatat</th>
-                                <th>Tindakan</th>
+                                <th>Riwayat Tindakan</th>
                                 <th class="text-center">Status</th>
                             </tr>
                         </thead>
@@ -393,8 +482,59 @@ function e($nilai)
                                             <?= e($riwayat['nama_guru']); ?>
                                         </td>
 
-                                        <td>
-                                            <?= e($riwayat['tindakan'] ?: 'Belum ada tindakan'); ?>
+                                        <td class="riwayat-tindakan">
+
+                                            <?php
+                                            $id_pelanggaran = (int) $riwayat['id'];
+                                            $daftar_tindakan = $data_tindakan[$id_pelanggaran] ?? [];
+                                            ?>
+
+                                            <?php if (count($daftar_tindakan) > 0): ?>
+
+                                                <?php foreach ($daftar_tindakan as $tindakan): ?>
+
+                                                    <div class="tindakan-item">
+
+                                                        <div class="tindakan-nama">
+                                                            <?= e($tindakan['tindakan']); ?>
+                                                        </div>
+
+                                                        <div class="tindakan-keterangan">
+                                                            <?= e($tindakan['keterangan']); ?>
+                                                        </div>
+
+                                                        <div class="tindakan-meta">
+                                                            <i class="fas fa-user me-1"></i>
+                                                            <?= e($tindakan['nama_penindak'] ?: 'Petugas'); ?>
+
+                                                            <br>
+
+                                                            <i class="fas fa-calendar me-1"></i>
+                                                            <?= e($tindakan['tanggal_tindakan']); ?>
+                                                        </div>
+
+                                                    </div>
+
+                                                <?php endforeach; ?>
+
+                                            <?php elseif (!empty($riwayat['tindakan'])): ?>
+
+                                                <span class="text-muted">
+                                                    <?= e($riwayat['tindakan']); ?>
+                                                </span>
+
+                                                <div class="tindakan-meta">
+                                                    Catatan tindakan sebelumnya
+                                                </div>
+
+                                            <?php else: ?>
+
+                                                <span class="text-muted">
+                                                    Belum ada tindakan
+                                                </span>
+
+                                            <?php endif; ?>
+
                                         </td>
 
                                         <td class="text-center">

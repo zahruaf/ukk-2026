@@ -155,6 +155,15 @@ if ($is_guru && !empty($user_id)) {
                 </a>
             </li>
 
+            <!-- MENU BARU: RIWAYAT TINDAKAN -->
+            <li class="nav-item">
+                <a href="riwayat_tindakan.php"
+                   class="nav-link <?= ($halaman == 'riwayat_tindakan') ? 'active' : '' ?>">
+                    <span class="menu-mark"><i class="fas fa-history"></i></span>
+                    Riwayat Tindakan Saya
+                </a>
+            </li>
+
         <?php endif; ?>
 
         <!-- MENU WALI KELAS -->

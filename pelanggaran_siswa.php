@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -80,32 +79,13 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
             OR tanggal_selesai = '0000-00-00'
             OR tanggal_selesai >= ?
         )
+        ORDER BY id DESC
+        LIMIT 1
     ";
-
-    if ($wali_kelas) {
-        $sql_penempatan .= "
-            AND kelas_id = ?
-            AND tahun_ajaran_id = ?
-        ";
-    }
-
-    $sql_penempatan .= " ORDER BY id DESC LIMIT 1";
 
     $stmt = mysqli_prepare($koneksi, $sql_penempatan);
 
-    if ($wali_kelas) {
-        mysqli_stmt_bind_param(
-            $stmt,
-            "issii",
-            $s_id,
-            $tgl,
-            $tgl,
-            $wali_kelas['kelas_id'],
-            $wali_kelas['tahun_ajaran_id']
-        );
-    } else {
-        mysqli_stmt_bind_param($stmt, "iss", $s_id, $tgl, $tgl);
-    }
+    mysqli_stmt_bind_param($stmt, "iss", $s_id, $tgl, $tgl);
 
     mysqli_stmt_execute($stmt);
     $q_penempatan = mysqli_stmt_get_result($stmt);
@@ -132,90 +112,29 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
 */
 
 // Tahun ajaran aktif
-if ($wali_kelas) {
-    $stmt = mysqli_prepare($koneksi, "
-        SELECT id, nama
-        FROM t_tahun_ajaran
-        WHERE status_aktif = 1
-        AND id = ?
-        ORDER BY id DESC
-    ");
-
-    mysqli_stmt_bind_param($stmt, "i", $wali_kelas['tahun_ajaran_id']);
-    mysqli_stmt_execute($stmt);
-    $query_tahun = mysqli_stmt_get_result($stmt);
-    mysqli_stmt_close($stmt);
-} else {
-    $query_tahun = mysqli_query($koneksi, "
-        SELECT id, nama
-        FROM t_tahun_ajaran
-        WHERE status_aktif = 1
-        ORDER BY id DESC
-    ");
-}
+$query_tahun = mysqli_query($koneksi, "
+    SELECT id, nama
+    FROM t_tahun_ajaran
+    WHERE status_aktif = 1
+    ORDER BY id DESC
+");
 
 // Data siswa
-if ($wali_kelas) {
-    // Wali Kelas hanya melihat siswa dari kelas yang menjadi tanggung jawabnya
-    $stmt = mysqli_prepare($koneksi, "
-        SELECT DISTINCT s.id, s.nis, s.nama
-        FROM t_siswa s
-        INNER JOIN t_kelas_siswa ks ON s.id = ks.siswa_id
-        WHERE s.status_aktif = 1
-        AND ks.kelas_id = ?
-        AND ks.tahun_ajaran_id = ?
-        AND ks.status_aktif = 1
-        AND ks.tanggal_mulai <= CURDATE()
-        AND (
-            ks.tanggal_selesai IS NULL
-            OR ks.tanggal_selesai = '0000-00-00'
-            OR ks.tanggal_selesai >= CURDATE()
-        )
-        ORDER BY s.nama ASC
-    ");
-
-    mysqli_stmt_bind_param(
-        $stmt,
-        "ii",
-        $wali_kelas['kelas_id'],
-        $wali_kelas['tahun_ajaran_id']
-    );
-
-    mysqli_stmt_execute($stmt);
-    $query_siswa = mysqli_stmt_get_result($stmt);
-    mysqli_stmt_close($stmt);
-} else {
-    // Petugas biasa tetap dapat melihat semua siswa aktif
-    $query_siswa = mysqli_query($koneksi, "
-        SELECT id, nis, nama
-        FROM t_siswa
-        WHERE status_aktif = 1
-        ORDER BY nama ASC
-    ");
-}
+// Semua Petugas, termasuk Wali Kelas, dapat memilih seluruh siswa aktif
+$query_siswa = mysqli_query($koneksi, "
+    SELECT id, nis, nama
+    FROM t_siswa
+    WHERE status_aktif = 1
+    ORDER BY nama ASC
+");
 
 // Data kelas
-if ($wali_kelas) {
-    $stmt = mysqli_prepare($koneksi, "
-        SELECT id, nama, tingkat, jurusan
-        FROM t_kelas
-        WHERE status_aktif = 1
-        AND id = ?
-        ORDER BY nama ASC
-    ");
-
-    mysqli_stmt_bind_param($stmt, "i", $wali_kelas['kelas_id']);
-    mysqli_stmt_execute($stmt);
-    $query_kelas = mysqli_stmt_get_result($stmt);
-    mysqli_stmt_close($stmt);
-} else {
-    $query_kelas = mysqli_query($koneksi, "
-        SELECT id, nama, tingkat, jurusan
-        FROM t_kelas
-        WHERE status_aktif = 1
-        ORDER BY nama ASC
-    ");
-}
+$query_kelas = mysqli_query($koneksi, "
+    SELECT id, nama, tingkat, jurusan
+    FROM t_kelas
+    WHERE status_aktif = 1
+    ORDER BY nama ASC
+");
 
 // Data jenis pelanggaran
 $query_pelanggaran = mysqli_query($koneksi, "
@@ -338,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data_kelas = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
             mysqli_stmt_close($stmt);
 
-            // Cek penempatan kelas siswa
+            // Cek penempatan kelas siswa berdasarkan tanggal pelanggaran
             $stmt = mysqli_prepare($koneksi, "
                 SELECT id
                 FROM t_kelas_siswa
@@ -368,18 +287,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             $data_penempatan = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
             mysqli_stmt_close($stmt);
-
-            // Pengamanan tambahan untuk Wali Kelas
-            // Tidak boleh mencatat siswa di luar kelas tanggung jawabnya
-            if (
-                $wali_kelas &&
-                (
-                    (int) $kelas_id !== (int) $wali_kelas['kelas_id'] ||
-                    (int) $tahun_ajaran_id !== (int) $wali_kelas['tahun_ajaran_id']
-                )
-            ) {
-                $data_penempatan = false;
-            }
 
             // Ambil jenis pelanggaran
             $stmt = mysqli_prepare($koneksi, "
@@ -462,7 +369,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     echo "<script>
                         alert('Catatan pelanggaran berhasil disimpan!');
-                        window.location='laporan.php';
+                        window.location='pelanggaran_siswa.php';
                     </script>";
                     exit;
 
@@ -753,9 +660,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <a href="laporan.php" class="btn btn-secondary px-4 py-2 rounded-3 fw-bold">
-                        Kembali
-                    </a>
+                    <a href="dashboard.php" class="btn btn-secondary px-4 py-2 rounded-3 fw-bold">
+                       Kembali
+                        </a>
 
                     <button
                         type="submit"
