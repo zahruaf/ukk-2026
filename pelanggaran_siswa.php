@@ -502,14 +502,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <form method="POST" action="pelanggaran_siswa.php">
 
                 <div class="row">
-
+             <!-- tahun ajaran -->
                     <div class="col-md-6 mb-3">
                         <label for="tahun_ajaran_id" class="form-label">
                             Tahun Ajaran
                         </label>
 
                         <select name="tahun_ajaran_id" id="tahun_ajaran_id" class="form-select searchable-select" required>
-                            <option value="">Pilih Tahun Ajaran</option>
+                        
 
                             <?php while ($tahun = mysqli_fetch_assoc($query_tahun)): ?>
                                 <option
@@ -540,7 +540,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="row">
-
+                <!--siswa-->
                     <div class="col-md-6 mb-3">
                         <label for="siswa_id" class="form-label">
                             Siswa

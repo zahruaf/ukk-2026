@@ -125,31 +125,6 @@ if (isset($_POST['tambah'])) {
     }
 }
 
-// NONAKTIFKAN DATA GURU
-if (isset($_POST['nonaktifkan'])) {
-    $id = (int)$_POST['id'];
-    $token = $_POST['csrf_token'] ?? '';
-
-    if (!hash_equals($csrf_token, $token)) {
-        $pesan_error = 'Permintaan tidak valid. Silakan coba kembali.';
-    } else {
-        $stmt = mysqli_prepare(
-            $koneksi,
-            "UPDATE t_guru SET status_aktif = 0 WHERE id = ?"
-        );
-
-        mysqli_stmt_bind_param($stmt, "i", $id);
-
-        if (mysqli_stmt_execute($stmt)) {
-            mysqli_stmt_close($stmt);
-            header("Location: data_guru.php");
-            exit;
-        }
-
-        $pesan_error = 'Gagal menonaktifkan data guru.';
-        mysqli_stmt_close($stmt);
-    }
-}
 
 // HAPUS PERMANEN DATA GURU
 if (isset($_POST['hapus_permanen'])) {
@@ -956,24 +931,9 @@ $data_guru = mysqli_query(
 
                                             <?php if ($guru['status_aktif'] == 1) { ?>
 
-                                                <form method="POST"
-                                                    onsubmit="return confirm('Menonaktifkan guru ini?');">
+                                                
 
-                                                    <input type="hidden" name="id"
-                                                        value="<?php echo $guru['id']; ?>">
-
-                                                    <input type="hidden" name="csrf_token"
-                                                        value="<?php echo htmlspecialchars($csrf_token); ?>">
-
-                                                    <button
-                                                        type="submit"
-                                                        name="nonaktifkan"
-                                                        class="action-link action-disable">
-                                                        Nonaktifkan
-                                                    </button>
-                                                </form>
-
-                                            <?php } else { ?>
+                                            
 
                                                 <form method="POST"
                                                     onsubmit="return confirm('Yakin mau menghapus guru ini secara permanen beserta akun login terkait?');">
