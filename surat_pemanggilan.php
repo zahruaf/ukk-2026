@@ -2,6 +2,8 @@
 <?php
 session_start();
 
+date_default_timezone_set('Asia/Jakarta');
+
 if (!isset($_SESSION['login'])) {
     header("Location: login.php");
     exit;
@@ -104,11 +106,14 @@ if (!$siswa) {
     die("Siswa tidak ditemukan, belum mencapai 50 poin, atau bukan siswa dalam kelas binaan Anda.");
 }
 
-// MENGAMBIL RINCIAN PELANGGARAN SEBAGAI ALASAN PEMANGGILAN
+// MENGAMBIL RINCIAN PELANGGARAN
 $sql_pelanggaran = "
     SELECT
+        ps.id,
         ps.tanggal,
         ps.poin,
+        ps.kelas_id,
+        ps.tahun_ajaran_id,
         p.nama AS nama_pelanggaran,
         k.nama AS nama_kelas
     FROM t_pelanggaran_siswa ps
@@ -142,6 +147,130 @@ while ($data = mysqli_fetch_assoc($hasil_pelanggaran)) {
 
 mysqli_stmt_close($stmt_pelanggaran);
 
+// MENGAMBIL KELAS DAN WALI KELAS SISWA PADA TAHUN AJARAN AKTIF
+$nama_kelas = '-';
+$nama_wali_kelas = '';
+
+$stmt_penempatan = mysqli_prepare($koneksi, "
+    SELECT
+        k.nama AS nama_kelas,
+        g.nama AS nama_wali_kelas
+    FROM t_kelas_siswa ks
+    INNER JOIN t_kelas k ON ks.kelas_id = k.id
+    INNER JOIN t_tahun_ajaran ta ON ks.tahun_ajaran_id = ta.id
+    LEFT JOIN t_wali_kelas wk
+        ON wk.kelas_id = ks.kelas_id
+        AND wk.tahun_ajaran_id = ks.tahun_ajaran_id
+        AND wk.status_aktif = 1
+    LEFT JOIN t_guru g
+        ON wk.guru_id = g.id
+        AND g.status_aktif = 1
+    WHERE ks.siswa_id = ?
+      AND ta.status_aktif = 1
+    ORDER BY ks.id DESC
+    LIMIT 1
+");
+
+mysqli_stmt_bind_param($stmt_penempatan, "i", $id_siswa);
+mysqli_stmt_execute($stmt_penempatan);
+
+$hasil_penempatan = mysqli_stmt_get_result($stmt_penempatan);
+$data_penempatan = mysqli_fetch_assoc($hasil_penempatan);
+
+mysqli_stmt_close($stmt_penempatan);
+
+if ($data_penempatan) {
+    $nama_kelas = $data_penempatan['nama_kelas'];
+    $nama_wali_kelas = $data_penempatan['nama_wali_kelas'] ?? '';
+}
+
+// FALLBACK KELAS DARI DATA PELANGGARAN JIKA PENEMPATAN TIDAK DITEMUKAN
+if ($nama_kelas == '-' && !empty($daftar_pelanggaran)) {
+    $nama_kelas = $daftar_pelanggaran[0]['nama_kelas'] ?? '-';
+}
+
+// FALLBACK MENGAMBIL WALI KELAS DARI KELAS PADA DATA PELANGGARAN
+if ($nama_wali_kelas == '' && !empty($daftar_pelanggaran)) {
+    $kelas_id = (int) $daftar_pelanggaran[0]['kelas_id'];
+    $tahun_ajaran_id = (int) $daftar_pelanggaran[0]['tahun_ajaran_id'];
+
+    $stmt_nama_wali = mysqli_prepare($koneksi, "
+        SELECT g.nama
+        FROM t_wali_kelas wk
+        INNER JOIN t_guru g ON wk.guru_id = g.id
+        WHERE wk.kelas_id = ?
+          AND wk.tahun_ajaran_id = ?
+          AND wk.status_aktif = 1
+          AND g.status_aktif = 1
+        LIMIT 1
+    ");
+
+    mysqli_stmt_bind_param(
+        $stmt_nama_wali,
+        "ii",
+        $kelas_id,
+        $tahun_ajaran_id
+    );
+
+    mysqli_stmt_execute($stmt_nama_wali);
+
+    $hasil_nama_wali = mysqli_stmt_get_result($stmt_nama_wali);
+    $data_nama_wali = mysqli_fetch_assoc($hasil_nama_wali);
+
+    $nama_wali_kelas = $data_nama_wali['nama'] ?? '';
+
+    mysqli_stmt_close($stmt_nama_wali);
+}
+
+if ($nama_wali_kelas == '') {
+    $nama_wali_kelas = 'Wali Kelas belum ditetapkan';
+}
+
+// FUNGSI FORMAT TANGGAL BAHASA INDONESIA
+function tanggalIndonesia($tanggal, $dengan_hari = false) {
+    $timestamp = strtotime($tanggal);
+
+    if ($timestamp === false) {
+        return '-';
+    }
+
+    $daftar_hari = [
+        'Sunday' => 'Minggu',
+        'Monday' => 'Senin',
+        'Tuesday' => 'Selasa',
+        'Wednesday' => 'Rabu',
+        'Thursday' => 'Kamis',
+        'Friday' => 'Jumat',
+        'Saturday' => 'Sabtu'
+    ];
+
+    $daftar_bulan = [
+        1 => 'Januari',
+        2 => 'Februari',
+        3 => 'Maret',
+        4 => 'April',
+        5 => 'Mei',
+        6 => 'Juni',
+        7 => 'Juli',
+        8 => 'Agustus',
+        9 => 'September',
+        10 => 'Oktober',
+        11 => 'November',
+        12 => 'Desember'
+    ];
+
+    $hari = $daftar_hari[date('l', $timestamp)];
+    $tanggal_angka = date('j', $timestamp);
+    $bulan = $daftar_bulan[(int) date('n', $timestamp)];
+    $tahun = date('Y', $timestamp);
+
+    if ($dengan_hari) {
+        return $hari . ', ' . $tanggal_angka . ' ' . $bulan . ' ' . $tahun;
+    }
+
+    return $tanggal_angka . ' ' . $bulan . ' ' . $tahun;
+}
+
 // DATA JADWAL PEMANGGILAN
 $tanggal_panggilan = '';
 $jam_panggilan = '';
@@ -160,19 +289,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $tempat_panggilan == ''
     ) {
         $pesan_error = "Semua jadwal pemanggilan wajib diisi.";
-    } elseif (
-        !DateTime::createFromFormat('Y-m-d', $tanggal_panggilan) ||
-        DateTime::createFromFormat('Y-m-d', $tanggal_panggilan)->format('Y-m-d') !== $tanggal_panggilan
-    ) {
-        $pesan_error = "Tanggal pemanggilan tidak valid.";
-    } elseif (
-        !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $jam_panggilan)
-    ) {
-        $pesan_error = "Jam pemanggilan tidak valid.";
     } else {
-        $tanggal_cek = DateTime::createFromFormat('Y-m-d', $tanggal_panggilan);
+        $tanggal_cek = DateTime::createFromFormat('!Y-m-d', $tanggal_panggilan);
 
-        if ($tanggal_cek < new DateTime('today')) {
+        if (
+            !$tanggal_cek ||
+            $tanggal_cek->format('Y-m-d') !== $tanggal_panggilan
+        ) {
+            $pesan_error = "Tanggal pemanggilan tidak valid.";
+        } elseif (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $jam_panggilan)) {
+            $pesan_error = "Jam pemanggilan tidak valid.";
+        } elseif ($tanggal_cek < new DateTime('today')) {
             $pesan_error = "Tanggal pemanggilan tidak boleh sudah lewat.";
         }
     }
@@ -229,6 +356,11 @@ function e($nilai) {
             margin: 25px 0;
         }
 
+        .tabel-pelanggaran {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
         .tabel-pelanggaran th,
         .tabel-pelanggaran td {
             border: 1px solid #333;
@@ -242,36 +374,84 @@ function e($nilai) {
             text-align: center;
         }
 
-        @media print {
-            body {
-                background: white;
-            }
-
-            .no-print {
-                display: none !important;
-            }
-
-            .container-surat {
-                max-width: 100%;
-                margin: 0;
-            }
-
-            .surat {
-                border: none;
-                padding: 0;
-            }
-
-            @page {
-                size: A4;
-                margin: 2cm;
-            }
+        .kop-alamat {
+            font-size: 13px;
+            margin-bottom: 5px;
         }
 
-        @media (max-width: 600px) {
-            .surat {
-                padding: 25px;
-            }
-        }
+        
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+
+    html,
+    body {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white;
+        font-size: 10pt;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .container-surat {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    .surat {
+        width: 100%;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        margin: 0;
+        font-size: 10pt;
+        line-height: 1.35;
+    }
+
+    .surat p {
+        margin-bottom: 8px;
+    }
+
+    .surat .judul-surat {
+        margin: 14px 0;
+    }
+
+    .kop-alamat {
+        font-size: 9pt;
+        margin-bottom: 3px;
+    }
+
+    .tabel-pelanggaran {
+        font-size: 9pt;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .tabel-pelanggaran th,
+    .tabel-pelanggaran td {
+        padding: 4px;
+    }
+
+    .tanda-tangan {
+        margin-top: 15px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .surat table {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
+
     </style>
 </head>
 
@@ -308,6 +488,10 @@ function e($nilai) {
 
                 <strong>NIS:</strong>
                 <?= e($siswa['nis']); ?>
+                <br>
+
+                <strong>Kelas:</strong>
+                <?= e($nama_kelas); ?>
                 <br>
 
                 <strong>Total Poin:</strong>
@@ -377,13 +561,14 @@ function e($nilai) {
 
         <div class="surat">
 
+            <!-- KOP SURAT -->
             <div class="text-center">
                 <h5 class="fw-bold mb-1">
                     SMK MUHAMMADIYAH KOTA TASIKMALAYA
                 </h5>
 
-                <p class="mb-1">
-                    SURAT PEMANGGILAN ORANG TUA/WALI SISWA
+                <p class="kop-alamat">
+                    Jl. Rumah Sakit No.29, Kota Tasikmalaya, Jawa Barat 46113
                 </p>
 
                 <hr style="border: 2px solid #000;">
@@ -397,7 +582,8 @@ function e($nilai) {
                 Kepada Yth.<br>
                 Bapak/Ibu Orang Tua/Wali dari:<br>
                 <strong><?= e($siswa['nama']); ?></strong><br>
-                NIS: <?= e($siswa['nis']); ?>
+                NIS: <?= e($siswa['nis']); ?><br>
+                Kelas: <?= e($nama_kelas); ?>
             </p>
 
             <p>Dengan hormat,</p>
@@ -417,7 +603,7 @@ function e($nilai) {
             </p>
 
             <div class="table-responsive">
-                <table class="table tabel-pelanggaran">
+                <table class="tabel-pelanggaran">
                     <thead>
                         <tr>
                             <th>No.</th>
@@ -436,7 +622,7 @@ function e($nilai) {
                                 <td><?= $no++; ?></td>
 
                                 <td>
-                                    <?= date('d-m-Y', strtotime($pelanggaran['tanggal'])); ?>
+                                    <?= e(tanggalIndonesia($pelanggaran['tanggal'])); ?>
                                 </td>
 
                                 <td>
@@ -466,7 +652,7 @@ function e($nilai) {
                 </table>
             </div>
 
-            <p>
+            <p class="mt-3">
                 Sehubungan dengan hal tersebut, kami mengharapkan
                 Bapak/Ibu Orang Tua/Wali untuk hadir ke sekolah guna
                 membahas perkembangan siswa, mengetahui penyebab
@@ -480,7 +666,9 @@ function e($nilai) {
             <table>
                 <tr>
                     <td width="150">Hari / Tanggal</td>
-                    <td>: <?= date('l, d-m-Y', strtotime($tanggal_panggilan)); ?></td>
+                    <td>
+                        : <?= e(tanggalIndonesia($tanggal_panggilan, true)); ?>
+                    </td>
                 </tr>
 
                 <tr>
@@ -500,17 +688,18 @@ function e($nilai) {
                 mengucapkan terima kasih.
             </p>
 
+            <!-- TANDA TANGAN WALI KELAS -->
             <div class="tanda-tangan">
                 <p>
-                    Tasikmalaya, <?= date('d-m-Y'); ?><br>
+                    Tasikmalaya, <?= e(tanggalIndonesia(date('Y-m-d'))); ?><br>
                     Hormat kami,
                 </p>
 
                 <br><br><br>
 
                 <p>
-                    <strong>________________________</strong><br>
-                    Pihak Sekolah
+                    <strong><u><?= e($nama_wali_kelas); ?></u></strong><br>
+                    Wali Kelas
                 </p>
             </div>
 
@@ -518,7 +707,6 @@ function e($nilai) {
 
         <div class="text-center my-4 no-print">
             <button onclick="window.print()" class="btn btn-success">
-                <i class="fas fa-print me-1"></i>
                 Cetak / Simpan PDF
             </button>
         </div>
