@@ -212,6 +212,79 @@ if ($wali_kelas_aktif) {
         LIMIT 5
     ");
 }
+
+// MENGAMBIL DATA SISWA DENGAN STATUS DANGER
+// DANGER JIKA TOTAL POIN >= 50 PADA TAHUN AJARAN AKTIF
+
+$sql_danger = "
+    SELECT
+        s.id,
+        s.nis,
+        s.nama AS nama_siswa,
+        GROUP_CONCAT(DISTINCT k.nama ORDER BY k.nama SEPARATOR ', ') AS nama_kelas,
+        SUM(ps.poin) AS total_poin,
+        COUNT(ps.id) AS jumlah_pelanggaran
+    FROM t_siswa s
+    INNER JOIN t_pelanggaran_siswa ps
+        ON s.id = ps.siswa_id
+    INNER JOIN t_tahun_ajaran ta
+        ON ps.tahun_ajaran_id = ta.id
+    LEFT JOIN t_kelas k
+        ON ps.kelas_id = k.id
+    WHERE s.status_aktif = 1
+      AND ta.status_aktif = 1
+      AND LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
+";
+
+if ($wali_kelas_aktif) {
+    $sql_danger .= "
+        AND EXISTS (
+            SELECT 1
+            FROM t_wali_kelas wk
+            INNER JOIN t_guru g ON wk.guru_id = g.id
+            WHERE g.user_id = ?
+              AND g.status_aktif = 1
+              AND wk.status_aktif = 1
+              AND wk.kelas_id = ps.kelas_id
+              AND wk.tahun_ajaran_id = ps.tahun_ajaran_id
+        )
+    ";
+}
+
+$sql_danger .= "
+    GROUP BY s.id, s.nis, s.nama
+    HAVING SUM(ps.poin) >= 50
+    ORDER BY total_poin DESC, s.nama ASC
+";
+
+if ($wali_kelas_aktif) {
+
+    $stmt_danger = mysqli_prepare($koneksi, $sql_danger);
+
+    mysqli_stmt_bind_param($stmt_danger, "i", $user_id);
+    mysqli_stmt_execute($stmt_danger);
+
+    $q_danger = mysqli_stmt_get_result($stmt_danger);
+
+} else {
+
+    $q_danger = mysqli_query($koneksi, $sql_danger);
+}
+
+$daftar_danger = [];
+
+if ($q_danger) {
+    while ($data_danger = mysqli_fetch_assoc($q_danger)) {
+        $daftar_danger[] = $data_danger;
+    }
+}
+
+// TOTAL SELURUH SISWA DANGER
+$total_danger = count($daftar_danger);
+
+// TAMPILKAN MAKSIMAL 5 SISWA DANGER
+$daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
+
 ?>
 
 <!DOCTYPE html>
@@ -550,6 +623,128 @@ if ($wali_kelas_aktif) {
                         </div>
                     </div>
                 </div>
+
+            </div>
+
+            <!-- PERINGATAN SISWA DANGER -->
+            <div class="content-card mb-4">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="section-title mb-1">
+                            <i class="fas fa-triangle-exclamation text-danger me-2"></i>
+                            Peringatan Siswa Danger
+                        </h5>
+
+                        <small class="text-muted">
+                            Siswa dengan akumulasi minimal 50 poin pada tahun ajaran aktif.
+                        </small>
+                    </div>
+
+                    <span class="badge bg-danger fs-6">
+                        <?= $total_danger; ?> Siswa
+                    </span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th>No</th>
+                                <th>NIS</th>
+                                <th>Nama Siswa</th>
+                                <th>Kelas</th>
+                                <th class="text-center">Jumlah Pelanggaran</th>
+                                <th class="text-center">Total Poin</th>
+                                <th class="text-center">Status</th>
+
+                                <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
+                                    <th class="text-center">Surat</th>
+                                <?php endif; ?>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            <?php if (count($daftar_danger_tampil) > 0): ?>
+
+                                <?php $no_danger = 1; ?>
+
+                                <?php foreach ($daftar_danger_tampil as $danger): ?>
+
+                                    <tr>
+                                        <td><?= $no_danger++; ?></td>
+
+                                        <td>
+                                            <?= htmlspecialchars($danger['nis'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                <?= htmlspecialchars($danger['nama_siswa'], ENT_QUOTES, 'UTF-8'); ?>
+                                            </strong>
+                                        </td>
+
+                                        <td>
+                                            <?= htmlspecialchars($danger['nama_kelas'] ?? '-', ENT_QUOTES, 'UTF-8'); ?>
+                                        </td>
+
+                                        <td class="text-center">
+                                            <?= $danger['jumlah_pelanggaran']; ?> Kasus
+                                        </td>
+
+                                        <td class="text-center">
+                                            <span class="badge bg-danger p-2">
+                                                <?= $danger['total_poin']; ?> Poin
+                                            </span>
+                                        </td>
+
+                                        <td class="text-center">
+                                            <span class="badge bg-danger">
+                                                DANGER
+                                            </span>
+                                        </td>
+
+                                        <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
+                                            <td class="text-center">
+                                                <a
+                                                    href="surat_pemanggilan.php?id=<?= (int) $danger['id']; ?>"
+                                                    class="btn btn-sm btn-outline-primary rounded-3"
+                                                >
+                                                    <i class="fas fa-file-alt me-1"></i>
+                                                    Buat Surat
+                                                </a>
+                                            </td>
+                                        <?php endif; ?>
+                                    </tr>
+
+                                <?php endforeach; ?>
+
+                            <?php else: ?>
+
+                                <tr>
+                                    <td
+                                        colspan="<?= ($role_pengguna == 'admin' || $wali_kelas_aktif) ? '8' : '7'; ?>"
+                                        class="text-center text-muted py-4"
+                                    >
+                                        <i class="fas fa-check-circle text-success me-1"></i>
+                                        Belum ada siswa yang mencapai 50 poin.
+                                    </td>
+                                </tr>
+
+                            <?php endif; ?>
+
+                        </tbody>
+
+                    </table>
+                </div>
+
+                <?php if ($total_danger > 5): ?>
+                    <small class="text-muted d-block mt-2">
+                        Menampilkan 5 dari <?= $total_danger; ?> siswa Danger dengan poin tertinggi.
+                    </small>
+                <?php endif; ?>
 
             </div>
 

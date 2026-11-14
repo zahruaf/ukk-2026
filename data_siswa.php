@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -21,8 +22,36 @@ $pesan = '';
 $edit_gagal = false;
 $data_edit = null;
 
+// CEK APAKAH NOMOR SUDAH DIGUNAKAN
+function nomorSudahDigunakan($koneksi, $kolom, $nomor, $id = 0)
+{
+    if ($kolom !== 'nis' && $kolom !== 'nisn') {
+        return false;
+    }
+
+    $sql = "SELECT id FROM t_siswa
+            WHERE $kolom = ? AND id <> ?
+            LIMIT 1";
+
+    $stmt = mysqli_prepare($koneksi, $sql);
+
+    if (!$stmt) {
+        return true;
+    }
+
+    mysqli_stmt_bind_param($stmt, "si", $nomor, $id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_store_result($stmt);
+
+    $duplikat = mysqli_stmt_num_rows($stmt) > 0;
+
+    mysqli_stmt_close($stmt);
+
+    return $duplikat;
+}
+
 // VALIDASI NIS DAN NISN
-function validasiNomorSiswa($nis, $nisn)
+function validasiNomorSiswa($koneksi, $nis, $nisn, $id = 0)
 {
     if (!preg_match('/^[0-9]{8}$/', $nis)) {
         return 'NIS harus terdiri dari tepat 8 digit angka.';
@@ -30,6 +59,14 @@ function validasiNomorSiswa($nis, $nisn)
 
     if (!preg_match('/^[0-9]{10}$/', $nisn)) {
         return 'NISN harus terdiri dari tepat 10 digit angka.';
+    }
+
+    if (nomorSudahDigunakan($koneksi, 'nis', $nis, $id)) {
+        return 'NIS sudah terdaftar. Silakan gunakan NIS lain.';
+    }
+
+    if (nomorSudahDigunakan($koneksi, 'nisn', $nisn, $id)) {
+        return 'NISN sudah terdaftar. Silakan gunakan NISN lain.';
     }
 
     return '';
@@ -45,7 +82,7 @@ if (isset($_POST['tambah'])) {
     $alamat = $_POST['alamat'];
     $status_aktif = $_POST['status_aktif'];
 
-    $pesan = validasiNomorSiswa($nis, $nisn);
+    $pesan = validasiNomorSiswa($koneksi, $nis, $nisn);
 
     if ($pesan == '') {
         $sql = "INSERT INTO t_siswa
@@ -77,7 +114,7 @@ if (isset($_GET['hapus_permanen'])) {
 
 // EDIT DATA
 if (isset($_POST['edit'])) {
-    $id = $_POST['id'];
+    $id = (int)$_POST['id'];
     $nis = $_POST['nis'];
     $nisn = $_POST['nisn'];
     $nama = $_POST['nama'];
@@ -86,7 +123,7 @@ if (isset($_POST['edit'])) {
     $alamat = $_POST['alamat'];
     $status_aktif = $_POST['status_aktif'];
 
-    $pesan = validasiNomorSiswa($nis, $nisn);
+    $pesan = validasiNomorSiswa($koneksi, $nis, $nisn, $id);
 
     if ($pesan == '') {
         $sql = "UPDATE t_siswa SET
@@ -114,7 +151,7 @@ if (isset($_POST['edit'])) {
 
 // DATA UNTUK EDIT
 if (!$edit_gagal && isset($_GET['edit'])) {
-    $id = $_GET['edit'];
+    $id = (int)$_GET['edit'];
     $hasil_edit = mysqli_query($koneksi, "SELECT * FROM t_siswa WHERE id = '$id'");
     $data_edit = mysqli_fetch_assoc($hasil_edit);
 }
@@ -124,7 +161,7 @@ if (!$edit_gagal && isset($_GET['edit'])) {
 | KONFIGURASI PAGINATION & PENCARIAN (SQL-BASED)
 |--------------------------------------------------------------------------
 */
-$batas = 10; // Jumlah data per halaman
+$batas = 10;
 $halaman_aktif = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $halaman_aktif = ($halaman_aktif < 1) ? 1 : $halaman_aktif;
 $mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
@@ -132,7 +169,7 @@ $mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
 // Tangkap keyword pencarian
 $cari = trim($_GET['cari'] ?? '');
 
-// Tampilkan hanya siswa aktif
+// Tampilkan seluruh siswa, termasuk yang nonaktif
 $where_sql = "WHERE 1=1";
 
 if ($cari !== '') {
@@ -402,19 +439,16 @@ $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY 
                 <?php if ($total_halaman > 1) { ?>
                     <nav class="mt-4">
                         <ul class="pagination justify-content-end mb-0">
-                            <!-- Tombol Previous -->
                             <li class="page-item <?php echo ($halaman_aktif <= 1) ? 'disabled' : ''; ?>">
                                 <a class="page-link" href="data_siswa.php?page=<?php echo $halaman_aktif - 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Previous</a>
                             </li>
 
-                            <!-- Angka Halaman -->
                             <?php for ($i = 1; $i <= $total_halaman; $i++) { ?>
                                 <li class="page-item <?php echo ($halaman_aktif == $i) ? 'active' : ''; ?>">
                                     <a class="page-link" href="data_siswa.php?page=<?php echo $i; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>" style="<?php echo ($halaman_aktif == $i) ? 'background-color: var(--teal); border-color: var(--teal); color: white;' : 'color: var(--navy);'; ?>"><?php echo $i; ?></a>
                                 </li>
                             <?php } ?>
 
-                            <!-- Tombol Next -->
                             <li class="page-item <?php echo ($halaman_aktif >= $total_halaman) ? 'disabled' : ''; ?>">
                                 <a class="page-link" href="data_siswa.php?page=<?php echo $halaman_aktif + 1; ?><?php echo $cari !== '' ? '&cari=' . urlencode($cari) : ''; ?>">Next</a>
                             </li>

@@ -218,12 +218,33 @@ while ($row_tindakan = mysqli_fetch_assoc($q_tindakan)) {
 
 mysqli_stmt_close($stmt_tindakan);
 
-// Total poin seluruh riwayat, sama seperti rekap kelas
+// Total poin hanya dari pelanggaran selesai
+// pada tahun ajaran aktif, sesuai aturan rekap poin
 $total_poin = 0;
 
 foreach ($data_riwayat as $riwayat) {
-    $total_poin += (int) $riwayat['poin'];
+    if (strtolower(trim($riwayat['status'] ?? '')) === 'selesai') {
+        $total_poin += (int) $riwayat['poin'];
+    }
 }
+
+// Tentukan status poin siswa
+if ($total_poin >= 50) {
+    $status_poin = 'DANGER';
+    $warna_status = 'danger';
+} elseif ($total_poin >= 25) {
+    $status_poin = 'Peringatan';
+    $warna_status = 'warning';
+} elseif ($total_poin >= 1) {
+    $status_poin = 'Normal';
+    $warna_status = 'primary';
+} else {
+    $status_poin = 'Aman';
+    $warna_status = 'success';
+}
+
+// Tombol surat hanya tersedia jika siswa DANGER
+$boleh_cetak_surat = ($total_poin >= 50);
 
 function e($nilai)
 {
@@ -398,7 +419,7 @@ function e($nilai)
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <div class="info-card">
                         <div class="info-label">Jumlah Pelanggaran</div>
                         <div class="info-value">
@@ -407,16 +428,58 @@ function e($nilai)
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <div class="info-card">
-                        <div class="info-label">Total Poin</div>
+                        <div class="info-label">Total Poin Selesai</div>
                         <div class="info-value">
                             <?= $total_poin; ?> Poin
                         </div>
                     </div>
                 </div>
 
+                <div class="col-md-4">
+                    <div class="info-card">
+                        <div class="info-label">Status Siswa</div>
+                        <div class="info-value">
+                            <span class="badge bg-<?= e($warna_status); ?>">
+                                <?= e($status_poin); ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
+
+            <?php if ($boleh_cetak_surat): ?>
+
+                <!-- TOMBOL SURAT PEMANGGILAN -->
+                <div class="content-card mb-4 border-danger">
+
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+
+                        <div>
+                            <h5 class="fw-bold text-danger mb-1">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Siswa dalam Status DANGER
+                            </h5>
+
+                            <p class="text-muted mb-0">
+                                Total poin siswa telah mencapai <?= $total_poin; ?> poin.
+                                Diperlukan tindak lanjut melalui pemanggilan orang tua/wali.
+                            </p>
+                        </div>
+
+                        <a href="surat_pemanggilan.php?id=<?= (int) $data_siswa['id']; ?>"
+                           class="btn btn-danger">
+                            <i class="fas fa-file-pdf me-2"></i>
+                            Cetak Surat Pemanggilan
+                        </a>
+
+                    </div>
+
+                </div>
+
+            <?php endif; ?>
 
             <!-- TABEL RIWAYAT -->
             <div class="content-card">
