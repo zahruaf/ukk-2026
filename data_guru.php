@@ -24,6 +24,31 @@ if (empty($_SESSION['csrf_token'])) {
 
 $csrf_token = $_SESSION['csrf_token'];
 
+// CEK APAKAH NIP SUDAH DIGUNAKAN GURU LAIN
+function nipSudahDigunakan($koneksi, $nip, $id = 0)
+{
+    $stmt = mysqli_prepare(
+        $koneksi,
+        "SELECT id FROM t_guru
+         WHERE nip = ? AND id != ?
+         LIMIT 1"
+    );
+
+    if (!$stmt) {
+        return true;
+    }
+
+    mysqli_stmt_bind_param($stmt, "si", $nip, $id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_store_result($stmt);
+
+    $duplikat = mysqli_stmt_num_rows($stmt) > 0;
+
+    mysqli_stmt_close($stmt);
+
+    return $duplikat;
+}
+
 // TAMBAH DATA GURU & OTOMATIS BUAT AKUN LOGIN
 if (isset($_POST['tambah'])) {
     $nip = trim($_POST['nip']);
@@ -35,6 +60,8 @@ if (isset($_POST['tambah'])) {
 
     if (!preg_match('/^[0-9]{18}$/', $nip)) {
         $pesan_error = 'NIP harus terdiri dari tepat 18 digit angka.';
+    } elseif (nipSudahDigunakan($koneksi, $nip)) {
+        $pesan_error = 'NIP tersebut sudah digunakan oleh guru lain.';
     } elseif ($nama === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $pesan_error = 'Nama atau format email tidak valid.';
     } elseif (!in_array($status_aktif, [0, 1], true)) {
@@ -249,6 +276,8 @@ if (isset($_POST['edit'])) {
 
     if (!preg_match('/^[0-9]{18}$/', $nip)) {
         $pesan_error = 'NIP harus terdiri dari tepat 18 digit angka.';
+    } elseif (nipSudahDigunakan($koneksi, $nip, $id)) {
+        $pesan_error = 'NIP tersebut sudah digunakan oleh guru lain.';
     } elseif ($nama === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $pesan_error = 'Nama atau format email tidak valid.';
     } elseif (!in_array($status_aktif, [0, 1], true)) {
@@ -930,10 +959,6 @@ $data_guru = mysqli_query(
                                             </a>
 
                                             <?php if ($guru['status_aktif'] == 1) { ?>
-
-                                                
-
-                                            
 
                                                 <form method="POST"
                                                     onsubmit="return confirm('Yakin mau menghapus guru ini secara permanen beserta akun login terkait?');">

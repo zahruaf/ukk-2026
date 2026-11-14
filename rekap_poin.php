@@ -20,7 +20,7 @@ if ($role !== 'petugas') {
 }
 
 // QUERY REKAP POIN PER SISWA UNTUK TAMPILAN WEB
-// HANYA MENGHITUNG PELANGGARAN YANG STATUSNYA SELESAI
+// HANYA MENGHITUNG PELANGGARAN SELESAI PADA TAHUN AJARAN AKTIF
 $query = mysqli_query($koneksi, "
     SELECT
         s.id,
@@ -32,6 +32,12 @@ $query = mysqli_query($koneksi, "
     LEFT JOIN t_pelanggaran_siswa ps
         ON s.id = ps.siswa_id
         AND LOWER(TRIM(COALESCE(ps.status, ''))) = 'selesai'
+        AND EXISTS (
+            SELECT 1
+            FROM t_tahun_ajaran ta
+            WHERE ta.id = ps.tahun_ajaran_id
+              AND ta.status_aktif = 1
+        )
     GROUP BY s.id, s.nis, s.nama
     ORDER BY total_poin DESC, s.nama ASC
 ");
@@ -100,7 +106,7 @@ $query = mysqli_query($koneksi, "
                 </h2>
 
                 <p class="text-muted m-0">
-                    Pantau akumulasi poin pelanggaran siswa.
+                    Pantau akumulasi poin pelanggaran siswa pada tahun ajaran aktif.
                 </p>
             </div>
 
@@ -172,7 +178,7 @@ $query = mysqli_query($koneksi, "
                                             <?php else: ?>
 
                                                 <span class="text-danger fw-bold">
-                                                    Bahaya / Sanksi Berat
+                                                    DANGER / Perlu Tindak Lanjut
                                                 </span>
 
                                             <?php endif; ?>
