@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -23,6 +24,7 @@ $jenis_pesan = '';
 $tanggal = date('Y-m-d');
 $siswa_id = '';
 $tahun_ajaran_id = '';
+$tahun_ajaran_nama = '';
 $kelas_id = '';
 $pelanggaran_id = '';
 $keterangan = '';
@@ -69,17 +71,22 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
     $tgl = trim($_GET['tanggal']);
 
     $sql_penempatan = "
-        SELECT kelas_id, tahun_ajaran_id
-        FROM t_kelas_siswa
-        WHERE siswa_id = ?
-        AND status_aktif = 1
-        AND tanggal_mulai <= ?
+        SELECT
+            ks.kelas_id,
+            ks.tahun_ajaran_id,
+            ta.nama AS tahun_ajaran_nama
+        FROM t_kelas_siswa ks
+        INNER JOIN t_tahun_ajaran ta
+            ON ks.tahun_ajaran_id = ta.id
+        WHERE ks.siswa_id = ?
+        AND ks.status_aktif = 1
+        AND ks.tanggal_mulai <= ?
         AND (
-            tanggal_selesai IS NULL
-            OR tanggal_selesai = '0000-00-00'
-            OR tanggal_selesai >= ?
+            ks.tanggal_selesai IS NULL
+            OR ks.tanggal_selesai = '0000-00-00'
+            OR ks.tanggal_selesai >= ?
         )
-        ORDER BY id DESC
+        ORDER BY ks.id DESC
         LIMIT 1
     ";
 
@@ -96,7 +103,8 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
         echo json_encode([
             'status' => 'success',
             'kelas_id' => $row['kelas_id'],
-            'tahun_ajaran_id' => $row['tahun_ajaran_id']
+            'tahun_ajaran_id' => $row['tahun_ajaran_id'],
+            'tahun_ajaran_nama' => $row['tahun_ajaran_nama']
         ]);
     } else {
         echo json_encode(['status' => 'not_found']);
@@ -110,14 +118,6 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
 | MENGAMBIL DATA PILIHAN DARI DATABASE UNTUK FORM
 |--------------------------------------------------------------------------
 */
-
-// Tahun ajaran aktif
-$query_tahun = mysqli_query($koneksi, "
-    SELECT id, nama
-    FROM t_tahun_ajaran
-    WHERE status_aktif = 1
-    ORDER BY id DESC
-");
 
 // Data siswa
 // Semua Petugas, termasuk Wali Kelas, dapat memilih seluruh siswa aktif
@@ -164,6 +164,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $keterangan = trim($_POST['keterangan'] ?? '');
     $tindakan = trim($_POST['tindakan'] ?? '');
     $status = trim($_POST['status'] ?? '');
+
+    // Ambil nama tahun ajaran untuk ditampilkan kembali jika valid
+    if ($tahun_ajaran_id > 0) {
+        $stmt = mysqli_prepare($koneksi, "
+            SELECT nama
+            FROM t_tahun_ajaran
+            WHERE id = ?
+            AND status_aktif = 1
+            LIMIT 1
+        ");
+
+        mysqli_stmt_bind_param($stmt, "i", $tahun_ajaran_id);
+        mysqli_stmt_execute($stmt);
+        $data_tahun_tampil = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+        mysqli_stmt_close($stmt);
+
+        if ($data_tahun_tampil) {
+            $tahun_ajaran_nama = $data_tahun_tampil['nama'];
+        }
+    }
 
     if (
         $tanggal === '' ||
@@ -442,6 +462,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
         }
 
+        .form-control[readonly] {
+            background-color: #f1f5f9;
+            cursor: not-allowed;
+            color: #475569;
+        }
+
         .ts-control {
             border-radius: 10px !important;
             border: 1px solid #cbd5e1 !important;
@@ -501,22 +527,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form method="POST" action="pelanggaran_siswa.php">
 
+                <!-- BARIS PERTAMA: SISWA & TANGGAL -->
                 <div class="row">
-             <!-- tahun ajaran -->
+
                     <div class="col-md-6 mb-3">
-                        <label for="tahun_ajaran_id" class="form-label">
-                            Tahun Ajaran
+                        <label for="siswa_id" class="form-label">
+                            Siswa
                         </label>
 
-                        <select name="tahun_ajaran_id" id="tahun_ajaran_id" class="form-select searchable-select" required>
-                        
+                        <select name="siswa_id" id="siswa_id" class="form-select searchable-select" required>
+                            <option value="">Pilih Siswa</option>
 
-                            <?php while ($tahun = mysqli_fetch_assoc($query_tahun)): ?>
+                            <?php while ($siswa = mysqli_fetch_assoc($query_siswa)): ?>
                                 <option
-                                    value="<?= (int) $tahun['id'] ?>"
-                                    <?= (string) $tahun_ajaran_id === (string) $tahun['id'] ? 'selected' : '' ?>
+                                    value="<?= (int) $siswa['id'] ?>"
+                                    <?= (string) $siswa_id === (string) $siswa['id'] ? 'selected' : '' ?>
                                 >
-                                    <?= htmlspecialchars($tahun['nama']) ?>
+                                    <?= htmlspecialchars($siswa['nis'] . ' - ' . $siswa['nama']) ?>
                                 </option>
                             <?php endwhile; ?>
                         </select>
@@ -539,26 +566,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 </div>
 
+                <!-- BARIS KEDUA: KELAS & TAHUN AJARAN -->
                 <div class="row">
-                <!--siswa-->
-                    <div class="col-md-6 mb-3">
-                        <label for="siswa_id" class="form-label">
-                            Siswa
-                        </label>
-
-                        <select name="siswa_id" id="siswa_id" class="form-select searchable-select" required>
-                            <option value="">Pilih Siswa</option>
-
-                            <?php while ($siswa = mysqli_fetch_assoc($query_siswa)): ?>
-                                <option
-                                    value="<?= (int) $siswa['id'] ?>"
-                                    <?= (string) $siswa_id === (string) $siswa['id'] ? 'selected' : '' ?>
-                                >
-                                    <?= htmlspecialchars($siswa['nis'] . ' - ' . $siswa['nama']) ?>
-                                </option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
 
                     <div class="col-md-6 mb-3">
                         <label for="kelas_id" class="form-label">
@@ -581,6 +590,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-text text-muted small mt-1" id="infoAutoFill">
                             💡 <i>Tip: Pilih siswa, kelas dan tahun ajaran akan terisi otomatis sesuai data aktif siswa.</i>
                         </div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="tahun_ajaran_tampil" class="form-label">
+                            Tahun Ajaran
+                        </label>
+
+                        <input
+                            type="hidden"
+                            name="tahun_ajaran_id"
+                            id="tahun_ajaran_id"
+                            value="<?= htmlspecialchars((string) $tahun_ajaran_id) ?>"
+                        >
+
+                        <input
+                            type="text"
+                            id="tahun_ajaran_tampil"
+                            class="form-control"
+                            value="<?= htmlspecialchars($tahun_ajaran_nama) ?>"
+                            placeholder="Otomatis setelah memilih siswa"
+                            readonly
+                        >
                     </div>
 
                 </div>
@@ -661,8 +692,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <a href="dashboard.php" class="btn btn-secondary px-4 py-2 rounded-3 fw-bold">
-                       Kembali
-                        </a>
+                        Kembali
+                    </a>
 
                     <button
                         type="submit"
@@ -701,39 +732,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         });
 
-        // Fitur Auto-Fill Kelas & Tahun Ajaran berdasarkan Siswa & Tanggal
+        // Elemen form
         const siswaSelect = document.getElementById('siswa_id');
         const tanggalInput = document.getElementById('tanggal');
+        const tahunAjaranInput = document.getElementById('tahun_ajaran_id');
+        const tahunAjaranTampil = document.getElementById('tahun_ajaran_tampil');
         const infoAutoFill = document.getElementById('infoAutoFill');
 
         function fetchSiswaInfo() {
             const siswaId = siswaSelect.value;
             const tanggal = tanggalInput.value;
 
-            if (!siswaId || !tanggal) return;
+            if (!siswaId || !tanggal) {
+                if (tomSelectInstances['kelas_id']) {
+                    tomSelectInstances['kelas_id'].clear();
+                }
+
+                tahunAjaranInput.value = '';
+                tahunAjaranTampil.value = '';
+
+                return;
+            }
 
             fetch(`pelanggaran_siswa.php?ajax_get_siswa_info=1&siswa_id=${siswaId}&tanggal=${tanggal}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
 
-                        // Set nilai ke Tom Select Kelas
+                        // Isi kelas secara otomatis
                         if (tomSelectInstances['kelas_id']) {
                             tomSelectInstances['kelas_id'].setValue(data.kelas_id);
                         }
 
-                        // Set nilai ke Tom Select Tahun Ajaran
-                        if (tomSelectInstances['tahun_ajaran_id']) {
-                            tomSelectInstances['tahun_ajaran_id'].setValue(data.tahun_ajaran_id);
-                        }
+                        // Isi tahun ajaran secara otomatis
+                        tahunAjaranInput.value = data.tahun_ajaran_id;
+                        tahunAjaranTampil.value = data.tahun_ajaran_nama;
 
-                        infoAutoFill.innerHTML = "✅ <span class='text-success fw-bold'>Kelas dan Tahun Ajaran terisi otomatis sesuai data siswa!</span>";
+            
 
                     } else {
+
+                        // Kosongkan jika penempatan tidak ditemukan
+                        if (tomSelectInstances['kelas_id']) {
+                            tomSelectInstances['kelas_id'].clear();
+                        }
+
+                        tahunAjaranInput.value = '';
+                        tahunAjaranTampil.value = '';
+
                         infoAutoFill.innerHTML = "⚠️ <span class='text-danger'>Penempatan kelas untuk siswa ini tidak ditemukan pada tanggal tersebut.</span>";
                     }
                 })
-                .catch(error => console.error('Error fetching data:', error));
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
         }
 
         if (siswaSelect) {

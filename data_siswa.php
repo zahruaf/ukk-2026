@@ -133,7 +133,7 @@ $mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
 $cari = trim($_GET['cari'] ?? '');
 
 // Tampilkan hanya siswa aktif
-$where_sql = "WHERE status_aktif = 1";
+$where_sql = "WHERE 1=1";
 
 if ($cari !== '') {
     $cari_esc = mysqli_real_escape_string($koneksi, $cari);
