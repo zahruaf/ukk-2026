@@ -778,7 +778,7 @@ function formatTanggalTindakan($tanggal)
                                     <div class="mb-3">
 
                                         <label class="form-label fw-bold">
-                                            Tindakan / Sanksi
+                                            Tindak Lanjut Penanganan
                                         </label>
 
                                         <select name="tindakan" class="form-select" required>

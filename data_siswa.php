@@ -22,28 +22,34 @@ $pesan = '';
 $edit_gagal = false;
 $data_edit = null;
 
-// CEK APAKAH NOMOR SUDAH DIGUNAKAN
+// CEK APAKAH NOMOR SUDAH DIGUNAKAN SISWA LAIN
 function nomorSudahDigunakan($koneksi, $kolom, $nomor, $id = 0)
 {
     if ($kolom !== 'nis' && $kolom !== 'nisn') {
         return false;
     }
 
-    $sql = "SELECT id FROM t_siswa
-            WHERE $kolom = ? AND id <> ?
-            LIMIT 1";
-
+    // AMBIL SEMUA SISWA YANG MEMILIKI NOMOR TERSEBUT
+    $sql = "SELECT id FROM t_siswa WHERE $kolom = ?";
     $stmt = mysqli_prepare($koneksi, $sql);
 
     if (!$stmt) {
         return true;
     }
 
-    mysqli_stmt_bind_param($stmt, "si", $nomor, $id);
+    mysqli_stmt_bind_param($stmt, "s", $nomor);
     mysqli_stmt_execute($stmt);
-    mysqli_stmt_store_result($stmt);
+    mysqli_stmt_bind_result($stmt, $id_ditemukan);
 
-    $duplikat = mysqli_stmt_num_rows($stmt) > 0;
+    $duplikat = false;
+
+    // BANDINKAN ID AGAR SISWA YANG SEDANG DIEDIT TIDAK DIANGGAP DUPLIKAT
+    while (mysqli_stmt_fetch($stmt)) {
+        if ((int)$id_ditemukan !== (int)$id) {
+            $duplikat = true;
+            break;
+        }
+    }
 
     mysqli_stmt_close($stmt);
 
@@ -62,11 +68,11 @@ function validasiNomorSiswa($koneksi, $nis, $nisn, $id = 0)
     }
 
     if (nomorSudahDigunakan($koneksi, 'nis', $nis, $id)) {
-        return 'NIS sudah terdaftar. Silakan gunakan NIS lain.';
+        return 'NIS sudah terdaftar pada siswa lain. Silakan gunakan NIS lain.';
     }
 
     if (nomorSudahDigunakan($koneksi, 'nisn', $nisn, $id)) {
-        return 'NISN sudah terdaftar. Silakan gunakan NISN lain.';
+        return 'NISN sudah terdaftar pada siswa lain. Silakan gunakan NISN lain.';
     }
 
     return '';
@@ -74,12 +80,12 @@ function validasiNomorSiswa($koneksi, $nis, $nisn, $id = 0)
 
 // TAMBAH DATA
 if (isset($_POST['tambah'])) {
-    $nis = $_POST['nis'];
-    $nisn = $_POST['nisn'];
-    $nama = $_POST['nama'];
+    $nis = trim($_POST['nis']);
+    $nisn = trim($_POST['nisn']);
+    $nama = trim($_POST['nama']);
     $jenis_kelamin = $_POST['jenis_kelamin'];
     $tanggal_lahir = $_POST['tanggal_lahir'];
-    $alamat = $_POST['alamat'];
+    $alamat = trim($_POST['alamat']);
     $status_aktif = $_POST['status_aktif'];
 
     $pesan = validasiNomorSiswa($koneksi, $nis, $nisn);
@@ -87,12 +93,19 @@ if (isset($_POST['tambah'])) {
     if ($pesan == '') {
         $sql = "INSERT INTO t_siswa
                 (nis, nisn, nama, jenis_kelamin, tanggal_lahir, alamat, status_aktif)
-                VALUES
-                ('$nis', '$nisn', '$nama', '$jenis_kelamin', '$tanggal_lahir', '$alamat', '$status_aktif')";
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        mysqli_query($koneksi, $sql);
-        header("Location: data_siswa.php");
-        exit;
+        $stmt = mysqli_prepare($koneksi, $sql);
+        mysqli_stmt_bind_param($stmt, "ssssssi", $nis, $nisn, $nama, $jenis_kelamin, $tanggal_lahir, $alamat, $status_aktif);
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            header("Location: data_siswa.php");
+            exit;
+        } else {
+            $pesan = 'Gagal menambahkan data siswa.';
+            mysqli_stmt_close($stmt);
+        }
     }
 }
 
@@ -115,36 +128,66 @@ if (isset($_GET['hapus_permanen'])) {
 // EDIT DATA
 if (isset($_POST['edit'])) {
     $id = (int)$_POST['id'];
-    $nis = $_POST['nis'];
-    $nisn = $_POST['nisn'];
-    $nama = $_POST['nama'];
+    $nis = trim($_POST['nis']);
+    $nisn = trim($_POST['nisn']);
+    $nama = trim($_POST['nama']);
     $jenis_kelamin = $_POST['jenis_kelamin'];
     $tanggal_lahir = $_POST['tanggal_lahir'];
-    $alamat = $_POST['alamat'];
+    $alamat = trim($_POST['alamat']);
     $status_aktif = $_POST['status_aktif'];
 
-    $pesan = validasiNomorSiswa($koneksi, $nis, $nisn, $id);
+    // PASTIKAN ID SISWA YANG DIEDIT MEMANG ADA
+    $cek_siswa = mysqli_prepare($koneksi, "SELECT id FROM t_siswa WHERE id = ?");
+    mysqli_stmt_bind_param($cek_siswa, "i", $id);
+    mysqli_stmt_execute($cek_siswa);
+    mysqli_stmt_store_result($cek_siswa);
+
+    if ($id <= 0 || mysqli_stmt_num_rows($cek_siswa) == 0) {
+        $pesan = 'Data siswa yang akan diedit tidak ditemukan.';
+    }
+
+    mysqli_stmt_close($cek_siswa);
+
+    // VALIDASI NIS DAN NISN DENGAN MENGECUALIKAN ID SISWA SENDIRI
+    if ($pesan == '') {
+        $pesan = validasiNomorSiswa($koneksi, $nis, $nisn, $id);
+    }
 
     if ($pesan == '') {
         $sql = "UPDATE t_siswa SET
-                nis = '$nis',
-                nisn = '$nisn',
-                nama = '$nama',
-                jenis_kelamin = '$jenis_kelamin',
-                tanggal_lahir = '$tanggal_lahir',
-                alamat = '$alamat',
-                status_aktif = '$status_aktif'
-                WHERE id = '$id'";
+                nis = ?,
+                nisn = ?,
+                nama = ?,
+                jenis_kelamin = ?,
+                tanggal_lahir = ?,
+                alamat = ?,
+                status_aktif = ?
+                WHERE id = ?";
 
-        mysqli_query($koneksi, $sql);
-        header("Location: data_siswa.php");
-        exit;
-    } else {
+        $stmt = mysqli_prepare($koneksi, $sql);
+        mysqli_stmt_bind_param($stmt, "ssssssii", $nis, $nisn, $nama, $jenis_kelamin, $tanggal_lahir, $alamat, $status_aktif, $id);
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            header("Location: data_siswa.php");
+            exit;
+        } else {
+            $pesan = 'Gagal memperbarui data siswa.';
+            mysqli_stmt_close($stmt);
+        }
+    }
+
+    if ($pesan != '') {
         $edit_gagal = true;
         $data_edit = [
-            'id' => $id, 'nis' => $nis, 'nisn' => $nisn, 'nama' => $nama,
-            'jenis_kelamin' => $jenis_kelamin, 'tanggal_lahir' => $tanggal_lahir,
-            'alamat' => $alamat, 'status_aktif' => $status_aktif
+            'id' => $id,
+            'nis' => $nis,
+            'nisn' => $nisn,
+            'nama' => $nama,
+            'jenis_kelamin' => $jenis_kelamin,
+            'tanggal_lahir' => $tanggal_lahir,
+            'alamat' => $alamat,
+            'status_aktif' => $status_aktif
         ];
     }
 }
@@ -166,10 +209,10 @@ $halaman_aktif = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $halaman_aktif = ($halaman_aktif < 1) ? 1 : $halaman_aktif;
 $mulai = ($halaman_aktif > 1) ? ($halaman_aktif * $batas) - $batas : 0;
 
-// Tangkap keyword pencarian
+// TANGKAP KEYWORD PENCARIAN
 $cari = trim($_GET['cari'] ?? '');
 
-// Tampilkan seluruh siswa, termasuk yang nonaktif
+// TAMPILKAN SELURUH SISWA, TERMASUK YANG NONAKTIF
 $where_sql = "WHERE 1=1";
 
 if ($cari !== '') {
@@ -183,14 +226,14 @@ if ($cari !== '') {
     )";
 }
 
-// Hitung total data sesuai pencarian untuk pagination
+// HITUNG TOTAL DATA SESUAI PENCARIAN
 $query_jml = mysqli_query($koneksi, "SELECT COUNT(*) AS total FROM t_siswa $where_sql");
 $row_jml = mysqli_fetch_assoc($query_jml);
 
 $total_data = $row_jml['total'];
 $total_halaman = ceil($total_data / $batas);
 
-// Ambil data siswa dengan LIMIT dan OFFSET
+// AMBIL DATA SISWA
 $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY id ASC LIMIT $mulai, $batas");
 ?>
 
@@ -233,6 +276,7 @@ $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY 
         .status-inactive { color: #9a4b16; background: #fff0dc; }
         .action-link { display: inline-block; padding: 6px 10px; border-radius: 7px; text-decoration: none; font-size: 13px; font-weight: 600; white-space: nowrap; }
         .action-edit { color: #0f766e; background: #dff8f3; }
+        .action-detail { color: #2457a6; background: #e8f0ff; }
         .action-disable { color: #b45309; background: #fff0dc; }
         .action-delete { color: #c33d4b; background: #fff0f0; }
         .table-count { color: var(--muted); font-size: 13px; }
@@ -361,7 +405,7 @@ $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY 
                         <p class="table-count mb-0">Total data: <?php echo $total_data; ?> siswa</p>
                     </div>
 
-                    <!-- FORM PENCARIAN (GET METHOD) -->
+                    <!-- FORM PENCARIAN -->
                     <div class="search-area">
                         <form method="GET" action="data_siswa.php">
                             <label for="cari" class="form-label">Cari Data Siswa</label>
@@ -414,11 +458,12 @@ $data_siswa = mysqli_query($koneksi, "SELECT * FROM t_siswa $where_sql ORDER BY 
                                         </td>
                                         <td>
                                             <div class="d-flex gap-2">
-                                                <a href="data_siswa.php?edit=<?php echo (int) $siswa['id']; ?>" class="action-link action-edit">Edit</a>
+                                                <a href="detail_siswa.php?id=<?php echo (int)$siswa['id']; ?>" class="action-link action-detail">Detail</a>
+                                                <a href="data_siswa.php?edit=<?php echo (int)$siswa['id']; ?>" class="action-link action-edit">Edit</a>
                                                 <?php if ($siswa['status_aktif'] == 1) { ?>
-                                                    <a href="data_siswa.php?nonaktifkan=<?php echo (int) $siswa['id']; ?>" class="action-link action-disable" onclick="return confirm('Menonaktifkan siswa ini?');">Nonaktifkan</a>
+                                                    <a href="data_siswa.php?nonaktifkan=<?php echo (int)$siswa['id']; ?>" class="action-link action-disable" onclick="return confirm('Menonaktifkan siswa ini?');">Nonaktifkan</a>
                                                 <?php } else { ?>
-                                                    <a href="data_siswa.php?hapus_permanen=<?php echo (int) $siswa['id']; ?>" class="action-link action-delete" onclick="return confirm('Yakin mau hapus data ini secara permanen?');">Hapus</a>
+                                                    <a href="data_siswa.php?hapus_permanen=<?php echo (int)$siswa['id']; ?>" class="action-link action-delete" onclick="return confirm('Yakin mau hapus data ini secara permanen?');">Hapus</a>
                                                 <?php } ?>
                                             </div>
                                         </td>

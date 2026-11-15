@@ -1,5 +1,6 @@
 
 <?php
+
 session_start();
 
 if (!isset($_SESSION['login'])) {
@@ -26,6 +27,7 @@ $siswa_id = '';
 $tahun_ajaran_id = '';
 $tahun_ajaran_nama = '';
 $kelas_id = '';
+$kelas_nama = '';
 $pelanggaran_id = '';
 $keterangan = '';
 $tindakan = '';
@@ -55,7 +57,9 @@ $stmt = mysqli_prepare($koneksi, "
 
 mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
+
 $wali_kelas = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
 mysqli_stmt_close($stmt);
 
 /*
@@ -64,7 +68,11 @@ mysqli_stmt_close($stmt);
 |--------------------------------------------------------------------------
 */
 
-if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_GET['tanggal'])) {
+if (
+    isset($_GET['ajax_get_siswa_info']) &&
+    isset($_GET['siswa_id']) &&
+    isset($_GET['tanggal'])
+) {
     header('Content-Type: application/json');
 
     $s_id = (int) $_GET['siswa_id'];
@@ -74,10 +82,15 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
         SELECT
             ks.kelas_id,
             ks.tahun_ajaran_id,
-            ta.nama AS tahun_ajaran_nama
+            ta.nama AS tahun_ajaran_nama,
+            k.nama AS kelas_nama,
+            k.tingkat,
+            k.jurusan
         FROM t_kelas_siswa ks
         INNER JOIN t_tahun_ajaran ta
             ON ks.tahun_ajaran_id = ta.id
+        INNER JOIN t_kelas k
+            ON ks.kelas_id = k.id
         WHERE ks.siswa_id = ?
         AND ks.status_aktif = 1
         AND ks.tanggal_mulai <= ?
@@ -95,14 +108,19 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
     mysqli_stmt_bind_param($stmt, "iss", $s_id, $tgl, $tgl);
 
     mysqli_stmt_execute($stmt);
+
     $q_penempatan = mysqli_stmt_get_result($stmt);
     $row = mysqli_fetch_assoc($q_penempatan);
+
     mysqli_stmt_close($stmt);
 
     if ($row) {
         echo json_encode([
             'status' => 'success',
             'kelas_id' => $row['kelas_id'],
+            'kelas_nama' => $row['kelas_nama'],
+            'tingkat' => $row['tingkat'],
+            'jurusan' => $row['jurusan'],
             'tahun_ajaran_id' => $row['tahun_ajaran_id'],
             'tahun_ajaran_nama' => $row['tahun_ajaran_nama']
         ]);
@@ -121,6 +139,7 @@ if (isset($_GET['ajax_get_siswa_info']) && isset($_GET['siswa_id']) && isset($_G
 
 // Data siswa
 // Semua Petugas, termasuk Wali Kelas, dapat memilih seluruh siswa aktif
+
 $query_siswa = mysqli_query($koneksi, "
     SELECT id, nis, nama
     FROM t_siswa
@@ -128,19 +147,16 @@ $query_siswa = mysqli_query($koneksi, "
     ORDER BY nama ASC
 ");
 
-// Data kelas
-$query_kelas = mysqli_query($koneksi, "
-    SELECT id, nama, tingkat, jurusan
-    FROM t_kelas
-    WHERE status_aktif = 1
-    ORDER BY nama ASC
-");
-
 // Data jenis pelanggaran
+
 $query_pelanggaran = mysqli_query($koneksi, "
-    SELECT p.id, p.nama, p.kode, p.poin,
-           p.pelanggaran_kategori_id,
-           k.nama AS nama_kategori
+    SELECT
+        p.id,
+        p.nama,
+        p.kode,
+        p.poin,
+        p.pelanggaran_kategori_id,
+        k.nama AS nama_kategori
     FROM t_pelanggaran p
     INNER JOIN t_pelanggaran_kategori k
         ON p.pelanggaran_kategori_id = k.id
@@ -156,6 +172,7 @@ $query_pelanggaran = mysqli_query($koneksi, "
 */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $tanggal = trim($_POST['tanggal'] ?? '');
     $siswa_id = (int) ($_POST['siswa_id'] ?? 0);
     $tahun_ajaran_id = (int) ($_POST['tahun_ajaran_id'] ?? 0);
@@ -166,7 +183,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = trim($_POST['status'] ?? '');
 
     // Ambil nama tahun ajaran untuk ditampilkan kembali jika valid
+
     if ($tahun_ajaran_id > 0) {
+
         $stmt = mysqli_prepare($koneksi, "
             SELECT nama
             FROM t_tahun_ajaran
@@ -177,11 +196,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         mysqli_stmt_bind_param($stmt, "i", $tahun_ajaran_id);
         mysqli_stmt_execute($stmt);
+
         $data_tahun_tampil = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
         mysqli_stmt_close($stmt);
 
         if ($data_tahun_tampil) {
             $tahun_ajaran_nama = $data_tahun_tampil['nama'];
+        }
+    }
+
+    // Ambil nama kelas untuk ditampilkan kembali jika valid
+
+    if ($kelas_id > 0) {
+
+        $stmt = mysqli_prepare($koneksi, "
+            SELECT nama, tingkat, jurusan
+            FROM t_kelas
+            WHERE id = ?
+            AND status_aktif = 1
+            LIMIT 1
+        ");
+
+        mysqli_stmt_bind_param($stmt, "i", $kelas_id);
+        mysqli_stmt_execute($stmt);
+
+        $data_kelas_tampil = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
+        mysqli_stmt_close($stmt);
+
+        if ($data_kelas_tampil) {
+            $kelas_nama = $data_kelas_tampil['nama'] . ' - ' .
+                          $data_kelas_tampil['tingkat'] . ' ' .
+                          $data_kelas_tampil['jurusan'];
         }
     }
 
@@ -214,9 +261,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jenis_pesan = 'danger';
 
     } else {
+
         $user_id = (int) ($_SESSION['id'] ?? 0);
 
         // Ambil data guru
+
         $stmt = mysqli_prepare($koneksi, "
             SELECT id, nama
             FROM t_guru
@@ -227,15 +276,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         mysqli_stmt_bind_param($stmt, "i", $user_id);
         mysqli_stmt_execute($stmt);
+
         $data_guru = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
         mysqli_stmt_close($stmt);
 
         if (!$data_guru) {
+
             $pesan = 'Akun yang login belum terhubung dengan data guru aktif.';
             $jenis_pesan = 'danger';
 
         } else {
+
             // Ambil data siswa
+
             $stmt = mysqli_prepare($koneksi, "
                 SELECT id, nama
                 FROM t_siswa
@@ -246,10 +300,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mysqli_stmt_bind_param($stmt, "i", $siswa_id);
             mysqli_stmt_execute($stmt);
+
             $data_siswa = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
             mysqli_stmt_close($stmt);
 
             // Ambil tahun ajaran
+
             $stmt = mysqli_prepare($koneksi, "
                 SELECT id
                 FROM t_tahun_ajaran
@@ -260,10 +317,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mysqli_stmt_bind_param($stmt, "i", $tahun_ajaran_id);
             mysqli_stmt_execute($stmt);
+
             $data_tahun = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
             mysqli_stmt_close($stmt);
 
             // Ambil kelas
+
             $stmt = mysqli_prepare($koneksi, "
                 SELECT id, nama
                 FROM t_kelas
@@ -274,10 +334,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mysqli_stmt_bind_param($stmt, "i", $kelas_id);
             mysqli_stmt_execute($stmt);
+
             $data_kelas = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
             mysqli_stmt_close($stmt);
 
             // Cek penempatan kelas siswa berdasarkan tanggal pelanggaran
+
             $stmt = mysqli_prepare($koneksi, "
                 SELECT id
                 FROM t_kelas_siswa
@@ -305,13 +368,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             mysqli_stmt_execute($stmt);
+
             $data_penempatan = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
             mysqli_stmt_close($stmt);
 
             // Ambil jenis pelanggaran
+
             $stmt = mysqli_prepare($koneksi, "
-                SELECT p.id, p.nama, p.poin,
-                       p.pelanggaran_kategori_id
+                SELECT
+                    p.id,
+                    p.nama,
+                    p.poin,
+                    p.pelanggaran_kategori_id
                 FROM t_pelanggaran p
                 INNER JOIN t_pelanggaran_kategori k
                     ON p.pelanggaran_kategori_id = k.id
@@ -323,7 +392,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mysqli_stmt_bind_param($stmt, "i", $pelanggaran_id);
             mysqli_stmt_execute($stmt);
+
             $data_jenis = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
             mysqli_stmt_close($stmt);
 
             if (
@@ -333,14 +404,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 !$data_penempatan ||
                 !$data_jenis
             ) {
+
                 $pesan = 'Data pilihan tidak valid atau penempatan siswa tidak sesuai.';
                 $jenis_pesan = 'danger';
 
             } else {
+
                 $nama_siswa = $data_siswa['nama'];
                 $nama_kelas = $data_kelas['nama'];
                 $nama_pelanggaran = $data_jenis['nama'];
                 $nama_guru = $data_guru['nama'];
+
                 $poin = (int) $data_jenis['poin'];
                 $kategori_id = (int) $data_jenis['pelanggaran_kategori_id'];
 
@@ -385,28 +459,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
 
                 if (mysqli_stmt_execute($stmt)) {
+
                     mysqli_stmt_close($stmt);
 
                     echo "<script>
                         alert('Catatan pelanggaran berhasil disimpan!');
                         window.location='pelanggaran_siswa.php';
                     </script>";
+
                     exit;
 
                 } else {
+
                     $pesan = 'Gagal menyimpan catatan pelanggaran. Periksa struktur database.';
                     $jenis_pesan = 'danger';
+
                     mysqli_stmt_close($stmt);
                 }
             }
         }
     }
 }
+
 ?>
 
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -420,6 +501,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 
     <style>
+
         :root {
             --navy: #101c35;
             --teal: #14b8a6;
@@ -493,7 +575,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 padding: 15px;
             }
         }
+
     </style>
+
 </head>
 
 <body>
@@ -501,10 +585,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php include 'includes/sidebar.php'; ?>
 
 <main class="main-content">
+
     <div class="container-fluid p-0">
 
         <!-- HEADER -->
+
         <div class="mb-4">
+
             <h2 class="fw-bold" style="color: var(--navy)">
                 Pencatatan Pelanggaran Siswa
             </h2>
@@ -512,44 +599,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="text-muted m-0">
                 Formulir untuk mencatat pelanggaran disiplin siswa.
             </p>
+
         </div>
 
         <?php if ($pesan !== ''): ?>
+
             <div class="alert alert-<?= htmlspecialchars($jenis_pesan) ?> alert-dismissible fade show rounded-3" role="alert">
+
                 <?= htmlspecialchars($pesan) ?>
 
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
             </div>
+
         <?php endif; ?>
 
         <!-- FORM CARD -->
+
         <div class="content-card">
 
             <form method="POST" action="pelanggaran_siswa.php">
 
                 <!-- BARIS PERTAMA: SISWA & TANGGAL -->
+
                 <div class="row">
 
                     <div class="col-md-6 mb-3">
+
                         <label for="siswa_id" class="form-label">
                             Siswa
                         </label>
 
                         <select name="siswa_id" id="siswa_id" class="form-select searchable-select" required>
+
                             <option value="">Pilih Siswa</option>
 
                             <?php while ($siswa = mysqli_fetch_assoc($query_siswa)): ?>
+
                                 <option
                                     value="<?= (int) $siswa['id'] ?>"
                                     <?= (string) $siswa_id === (string) $siswa['id'] ? 'selected' : '' ?>
                                 >
                                     <?= htmlspecialchars($siswa['nis'] . ' - ' . $siswa['nama']) ?>
                                 </option>
+
                             <?php endwhile; ?>
+
                         </select>
+
                     </div>
 
                     <div class="col-md-6 mb-3">
+
                         <label for="tanggal" class="form-label">
                             Tanggal Pelanggaran
                         </label>
@@ -562,37 +663,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             value="<?= htmlspecialchars($tanggal) ?>"
                             required
                         >
+
                     </div>
 
                 </div>
 
                 <!-- BARIS KEDUA: KELAS & TAHUN AJARAN -->
+
                 <div class="row">
 
                     <div class="col-md-6 mb-3">
-                        <label for="kelas_id" class="form-label">
-                            Kelas
+
+                        <label for="kelas_tampil" class="form-label">
+                            Kelas Siswa
                         </label>
 
-                        <select name="kelas_id" id="kelas_id" class="form-select searchable-select" required>
-                            <option value="">Pilih Kelas</option>
+                        <!-- ID KELAS DIKIRIM KE PHP, TIDAK BISA DIUBAH MANUAL -->
 
-                            <?php while ($kelas = mysqli_fetch_assoc($query_kelas)): ?>
-                                <option
-                                    value="<?= (int) $kelas['id'] ?>"
-                                    <?= (string) $kelas_id === (string) $kelas['id'] ? 'selected' : '' ?>
-                                >
-                                    <?= htmlspecialchars($kelas['nama'] . ' - ' . $kelas['tingkat'] . ' ' . $kelas['jurusan']) ?>
-                                </option>
-                            <?php endwhile; ?>
-                        </select>
+                        <input
+                            type="hidden"
+                            name="kelas_id"
+                            id="kelas_id"
+                            value="<?= htmlspecialchars((string) $kelas_id) ?>"
+                        >
+
+                        <!-- KELAS HANYA DITAMPILKAN, TIDAK BISA DIKETIK -->
+
+                        <input
+                            type="text"
+                            id="kelas_tampil"
+                            class="form-control"
+                            value="<?= htmlspecialchars($kelas_nama) ?>"
+                            placeholder="Otomatis setelah memilih siswa"
+                            readonly
+                        >
 
                         <div class="form-text text-muted small mt-1" id="infoAutoFill">
-                            💡 <i>Tip: Pilih siswa, kelas dan tahun ajaran akan terisi otomatis sesuai data aktif siswa.</i>
+                            Kelas akan terisi otomatis sesuai data penempatan siswa.
                         </div>
+
                     </div>
 
                     <div class="col-md-6 mb-3">
+
                         <label for="tahun_ajaran_tampil" class="form-label">
                             Tahun Ajaran
                         </label>
@@ -612,30 +725,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             placeholder="Otomatis setelah memilih siswa"
                             readonly
                         >
+
                     </div>
 
                 </div>
 
                 <div class="mb-3">
+
                     <label for="pelanggaran_id" class="form-label">
                         Jenis Pelanggaran & Poin
                     </label>
 
                     <select name="pelanggaran_id" id="pelanggaran_id" class="form-select searchable-select" required>
+
                         <option value="">Pilih Jenis Pelanggaran</option>
 
                         <?php while ($pelanggaran = mysqli_fetch_assoc($query_pelanggaran)): ?>
+
                             <option
                                 value="<?= (int) $pelanggaran['id'] ?>"
                                 <?= (string) $pelanggaran_id === (string) $pelanggaran['id'] ? 'selected' : '' ?>
                             >
                                 <?= htmlspecialchars($pelanggaran['kode'] . ' - ' . $pelanggaran['nama'] . ' (' . $pelanggaran['poin'] . ' Poin)') ?>
                             </option>
+
                         <?php endwhile; ?>
+
                     </select>
+
                 </div>
 
                 <div class="mb-3">
+
                     <label for="keterangan" class="form-label">
                         Keterangan Kejadian
                     </label>
@@ -648,11 +769,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         placeholder="Tuliskan kronologi atau catatan singkat..."
                         required
                     ><?= htmlspecialchars($keterangan) ?></textarea>
+
                 </div>
 
                 <div class="row">
 
                     <div class="col-md-6 mb-3">
+
                         <label for="tindakan" class="form-label">
                             Tindakan / Sanksi Awal
                         </label>
@@ -665,9 +788,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             placeholder="Contoh: Teguran lisan & nasihat"
                             required
                         ><?= htmlspecialchars($tindakan) ?></textarea>
+
                     </div>
 
                     <div class="col-md-6 mb-3">
+
                         <label for="status" class="form-label">
                             Status Penanganan
                         </label>
@@ -686,11 +811,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-text text-muted small mt-1">
                             Maksimal 30 karakter.
                         </div>
+
                     </div>
 
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
+
                     <a href="dashboard.php" class="btn btn-secondary px-4 py-2 rounded-3 fw-bold">
                         Kembali
                     </a>
@@ -702,6 +829,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     >
                         Simpan Pelanggaran
                     </button>
+
                 </div>
 
             </form>
@@ -709,94 +837,146 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
     </div>
+
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Tom Select JS CDN -->
+
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
 
-        // Inisialisasi Tom Select
-        const tomSelectInstances = {};
+document.addEventListener("DOMContentLoaded", function() {
 
-        document.querySelectorAll('.searchable-select').forEach((el) => {
-            tomSelectInstances[el.id] = new TomSelect(el, {
-                create: false,
-                sortField: {
-                    field: "text",
-                    direction: "asc"
-                }
-            });
-        });
+    // Inisialisasi Tom Select
+const tomSelectInstances = {};
 
-        // Elemen form
-        const siswaSelect = document.getElementById('siswa_id');
-        const tanggalInput = document.getElementById('tanggal');
-        const tahunAjaranInput = document.getElementById('tahun_ajaran_id');
-        const tahunAjaranTampil = document.getElementById('tahun_ajaran_tampil');
-        const infoAutoFill = document.getElementById('infoAutoFill');
+document.querySelectorAll('.searchable-select').forEach((el) => {
+    tomSelectInstances[el.id] = new TomSelect(el, {
+        create: false,
+        maxOptions: null, // Menampilkan semua pilihan tanpa batas jumlah
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+});
 
-        function fetchSiswaInfo() {
-            const siswaId = siswaSelect.value;
-            const tanggal = tanggalInput.value;
+    // Elemen form
 
-            if (!siswaId || !tanggal) {
-                if (tomSelectInstances['kelas_id']) {
-                    tomSelectInstances['kelas_id'].clear();
-                }
+    const siswaSelect = document.getElementById('siswa_id');
+    const tanggalInput = document.getElementById('tanggal');
+
+    const kelasIdInput = document.getElementById('kelas_id');
+    const kelasTampil = document.getElementById('kelas_tampil');
+
+    const tahunAjaranInput = document.getElementById('tahun_ajaran_id');
+    const tahunAjaranTampil = document.getElementById('tahun_ajaran_tampil');
+
+    const infoAutoFill = document.getElementById('infoAutoFill');
+
+    function fetchSiswaInfo() {
+
+        const siswaId = siswaSelect.value;
+        const tanggal = tanggalInput.value;
+
+        if (!siswaId || !tanggal) {
+
+            kelasIdInput.value = '';
+            kelasTampil.value = '';
+
+            tahunAjaranInput.value = '';
+            tahunAjaranTampil.value = '';
+
+            infoAutoFill.innerHTML =
+                'Kelas akan terisi otomatis sesuai data penempatan siswa.';
+
+            return;
+        }
+
+        kelasIdInput.value = '';
+        kelasTampil.value = '';
+
+        tahunAjaranInput.value = '';
+        tahunAjaranTampil.value = '';
+
+        infoAutoFill.innerHTML =
+            'Sedang mengambil data penempatan siswa...';
+
+        fetch(
+            `pelanggaran_siswa.php?ajax_get_siswa_info=1&siswa_id=${siswaId}&tanggal=${tanggal}`
+        )
+
+        .then(response => response.json())
+
+        .then(data => {
+
+            if (data.status === 'success') {
+
+                // Isi kelas secara otomatis
+
+                kelasIdInput.value = data.kelas_id;
+
+                kelasTampil.value =
+                    data.kelas_nama + ' - ' +
+                    data.tingkat + ' ' +
+                    data.jurusan;
+
+                // Isi tahun ajaran secara otomatis
+
+                tahunAjaranInput.value = data.tahun_ajaran_id;
+
+                tahunAjaranTampil.value = data.tahun_ajaran_nama;
+
+                infoAutoFill.innerHTML =
+                    "Kelas berhasil diisi otomatis sesuai penempatan siswa.";
+
+            } else {
+
+                // Kosongkan jika penempatan tidak ditemukan
+
+                kelasIdInput.value = '';
+                kelasTampil.value = '';
 
                 tahunAjaranInput.value = '';
                 tahunAjaranTampil.value = '';
 
-                return;
+                infoAutoFill.innerHTML =
+                    "<span class='text-danger'>Penempatan kelas untuk siswa ini tidak ditemukan pada tanggal tersebut.</span>";
+
             }
 
-            fetch(`pelanggaran_siswa.php?ajax_get_siswa_info=1&siswa_id=${siswaId}&tanggal=${tanggal}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
+        })
 
-                        // Isi kelas secara otomatis
-                        if (tomSelectInstances['kelas_id']) {
-                            tomSelectInstances['kelas_id'].setValue(data.kelas_id);
-                        }
+        .catch(error => {
 
-                        // Isi tahun ajaran secara otomatis
-                        tahunAjaranInput.value = data.tahun_ajaran_id;
-                        tahunAjaranTampil.value = data.tahun_ajaran_nama;
+            console.error('Error fetching data:', error);
 
-            
+            kelasIdInput.value = '';
+            kelasTampil.value = '';
 
-                    } else {
+            tahunAjaranInput.value = '';
+            tahunAjaranTampil.value = '';
 
-                        // Kosongkan jika penempatan tidak ditemukan
-                        if (tomSelectInstances['kelas_id']) {
-                            tomSelectInstances['kelas_id'].clear();
-                        }
+            infoAutoFill.innerHTML =
+                "<span class='text-danger'>Gagal mengambil data penempatan siswa.</span>";
 
-                        tahunAjaranInput.value = '';
-                        tahunAjaranTampil.value = '';
+        });
 
-                        infoAutoFill.innerHTML = "⚠️ <span class='text-danger'>Penempatan kelas untuk siswa ini tidak ditemukan pada tanggal tersebut.</span>";
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                });
-        }
+    }
 
-        if (siswaSelect) {
-            siswaSelect.addEventListener('change', fetchSiswaInfo);
-        }
+    if (siswaSelect) {
+        siswaSelect.addEventListener('change', fetchSiswaInfo);
+    }
 
-        if (tanggalInput) {
-            tanggalInput.addEventListener('change', fetchSiswaInfo);
-        }
+    if (tanggalInput) {
+        tanggalInput.addEventListener('change', fetchSiswaInfo);
+    }
 
-    });
+});
+
 </script>
 
 </body>

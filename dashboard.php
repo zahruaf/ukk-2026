@@ -10,7 +10,6 @@ if (!isset($_SESSION['login'])) {
 include 'config/koneksi.php';
 
 $halaman = 'dashboard';
-
 $nama_pengguna = htmlspecialchars($_SESSION['name'] ?? 'Pengguna');
 $role_pengguna = $_SESSION['role'] ?? '';
 $email_login = $_SESSION['email'] ?? '';
@@ -28,7 +27,6 @@ $daftar_kelas_wali = [];
 $nama_kelas_wali = '';
 
 if ($role_pengguna == 'petugas') {
-
     $stmt_wali = mysqli_prepare($koneksi, "
         SELECT DISTINCT
             wk.kelas_id,
@@ -48,7 +46,6 @@ if ($role_pengguna == 'petugas') {
 
     mysqli_stmt_bind_param($stmt_wali, "i", $user_id);
     mysqli_stmt_execute($stmt_wali);
-
     $hasil_wali = mysqli_stmt_get_result($stmt_wali);
 
     while ($data_wali = mysqli_fetch_assoc($hasil_wali)) {
@@ -59,7 +56,6 @@ if ($role_pengguna == 'petugas') {
 
     if (count($daftar_kelas_wali) > 0) {
         $wali_kelas_aktif = true;
-
         $nama_kelas = array_column($daftar_kelas_wali, 'nama_kelas');
         $nama_kelas_wali = implode(', ', array_unique($nama_kelas));
     }
@@ -67,7 +63,6 @@ if ($role_pengguna == 'petugas') {
 
 // MENGAMBIL TOTAL DATA SISWA
 if ($wali_kelas_aktif) {
-
     // WALI KELAS HANYA MENGHITUNG SISWA DI KELAS BINAANNYA
     $stmt_siswa = mysqli_prepare($koneksi, "
         SELECT COUNT(DISTINCT s.id) AS total
@@ -94,14 +89,10 @@ if ($wali_kelas_aktif) {
 
     mysqli_stmt_bind_param($stmt_siswa, "i", $user_id);
     mysqli_stmt_execute($stmt_siswa);
-
     $hasil_siswa = mysqli_stmt_get_result($stmt_siswa);
     $total_siswa = mysqli_fetch_assoc($hasil_siswa)['total'] ?? 0;
-
     mysqli_stmt_close($stmt_siswa);
-
 } else {
-
     // ADMIN DAN PETUGAS BIASA MELIHAT TOTAL SISWA AKTIF
     $q_siswa = mysqli_query($koneksi, "
         SELECT COUNT(*) AS total
@@ -123,7 +114,6 @@ $total_guru = mysqli_fetch_assoc($q_guru)['total'] ?? 0;
 
 // MENGAMBIL TOTAL DATA KELAS
 if ($wali_kelas_aktif) {
-
     // WALI KELAS HANYA MENGHITUNG KELAS BINAANNYA
     $stmt_kelas = mysqli_prepare($koneksi, "
         SELECT COUNT(DISTINCT wk.kelas_id) AS total
@@ -140,14 +130,10 @@ if ($wali_kelas_aktif) {
 
     mysqli_stmt_bind_param($stmt_kelas, "i", $user_id);
     mysqli_stmt_execute($stmt_kelas);
-
     $hasil_kelas = mysqli_stmt_get_result($stmt_kelas);
     $total_kelas = mysqli_fetch_assoc($hasil_kelas)['total'] ?? 0;
-
     mysqli_stmt_close($stmt_kelas);
-
 } else {
-
     // ADMIN DAN PETUGAS BIASA MELIHAT TOTAL KELAS AKTIF
     $q_kelas = mysqli_query($koneksi, "
         SELECT COUNT(*) AS total
@@ -160,7 +146,6 @@ if ($wali_kelas_aktif) {
 
 // MENGAMBIL DATA PELANGGARAN TERBARU
 if ($wali_kelas_aktif) {
-
     // WALI KELAS HANYA MELIHAT PELANGGARAN KELAS BINAANNYA
     $stmt_terbaru = mysqli_prepare($koneksi, "
         SELECT
@@ -191,11 +176,8 @@ if ($wali_kelas_aktif) {
 
     mysqli_stmt_bind_param($stmt_terbaru, "i", $user_id);
     mysqli_stmt_execute($stmt_terbaru);
-
     $q_terbaru = mysqli_stmt_get_result($stmt_terbaru);
-
 } else {
-
     // ADMIN DAN PETUGAS BIASA MELIHAT PELANGGARAN TERBARU SECARA GLOBAL
     $q_terbaru = mysqli_query($koneksi, "
         SELECT
@@ -215,7 +197,6 @@ if ($wali_kelas_aktif) {
 
 // MENGAMBIL DATA SISWA DENGAN STATUS DANGER
 // DANGER JIKA TOTAL POIN >= 50 PADA TAHUN AJARAN AKTIF
-
 $sql_danger = "
     SELECT
         s.id,
@@ -258,16 +239,11 @@ $sql_danger .= "
 ";
 
 if ($wali_kelas_aktif) {
-
     $stmt_danger = mysqli_prepare($koneksi, $sql_danger);
-
     mysqli_stmt_bind_param($stmt_danger, "i", $user_id);
     mysqli_stmt_execute($stmt_danger);
-
     $q_danger = mysqli_stmt_get_result($stmt_danger);
-
 } else {
-
     $q_danger = mysqli_query($koneksi, $sql_danger);
 }
 
@@ -285,6 +261,100 @@ $total_danger = count($daftar_danger);
 // TAMPILKAN MAKSIMAL 5 SISWA DANGER
 $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
 
+// MENGAMBIL TAHUN AJARAN AKTIF UNTUK DASHBOARD ANALITIK
+$q_tahun_aktif = mysqli_query($koneksi, "
+    SELECT id, nama, tanggal_mulai, tanggal_selesai
+    FROM t_tahun_ajaran
+    WHERE status_aktif = 1
+    ORDER BY id DESC
+    LIMIT 1
+");
+
+$tahun_ajaran_aktif = $q_tahun_aktif ? mysqli_fetch_assoc($q_tahun_aktif) : null;
+$ada_tahun_ajaran_aktif = $tahun_ajaran_aktif && !empty($tahun_ajaran_aktif['tanggal_mulai']) && !empty($tahun_ajaran_aktif['tanggal_selesai']);
+$tahun_ajaran_label = $ada_tahun_ajaran_aktif ? $tahun_ajaran_aktif['nama'] : 'Belum ditentukan';
+
+// DATA GRAFIK TREN PELANGGARAN BULANAN
+$grafik_bulanan_labels = [];
+$grafik_bulanan_data = [];
+
+if ($ada_tahun_ajaran_aktif) {
+    $tahun_ajaran_id_grafik = (int) $tahun_ajaran_aktif['id'];
+    $tanggal_mulai_grafik = $tahun_ajaran_aktif['tanggal_mulai'];
+    $tanggal_selesai_grafik = $tahun_ajaran_aktif['tanggal_selesai'];
+
+    // SIAPKAN FILTER TAMBAHAN KHUSUS WALI KELAS
+    $filter_wali_grafik = '';
+
+    if ($wali_kelas_aktif) {
+        $filter_wali_grafik = "
+            AND EXISTS (
+                SELECT 1
+                FROM t_wali_kelas wk
+                INNER JOIN t_guru g ON wk.guru_id = g.id
+                WHERE g.user_id = ?
+                  AND g.status_aktif = 1
+                  AND wk.status_aktif = 1
+                  AND wk.tahun_ajaran_id = ps.tahun_ajaran_id
+                  AND wk.kelas_id = ps.kelas_id
+            )
+        ";
+    }
+
+    // MENGAMBIL JUMLAH PELANGGARAN PER BULAN
+    $sql_grafik_bulanan = "
+        SELECT DATE_FORMAT(ps.tanggal, '%Y-%m') AS periode, COUNT(*) AS total
+        FROM t_pelanggaran_siswa ps
+        WHERE ps.tahun_ajaran_id = ?
+          AND ps.tanggal BETWEEN ? AND ?
+          $filter_wali_grafik
+        GROUP BY YEAR(ps.tanggal), MONTH(ps.tanggal)
+        ORDER BY YEAR(ps.tanggal), MONTH(ps.tanggal)
+    ";
+
+    $stmt_grafik_bulanan = mysqli_prepare($koneksi, $sql_grafik_bulanan);
+
+    if ($stmt_grafik_bulanan) {
+        if ($wali_kelas_aktif) {
+            mysqli_stmt_bind_param($stmt_grafik_bulanan, 'issi', $tahun_ajaran_id_grafik, $tanggal_mulai_grafik, $tanggal_selesai_grafik, $user_id);
+        } else {
+            mysqli_stmt_bind_param($stmt_grafik_bulanan, 'iss', $tahun_ajaran_id_grafik, $tanggal_mulai_grafik, $tanggal_selesai_grafik);
+        }
+
+        mysqli_stmt_execute($stmt_grafik_bulanan);
+        $hasil_grafik_bulanan = mysqli_stmt_get_result($stmt_grafik_bulanan);
+        $data_bulanan_tersimpan = [];
+
+        while ($data_bulanan = mysqli_fetch_assoc($hasil_grafik_bulanan)) {
+            $data_bulanan_tersimpan[$data_bulanan['periode']] = (int) $data_bulanan['total'];
+        }
+
+        mysqli_stmt_close($stmt_grafik_bulanan);
+
+        // BUAT LABEL SEMUA BULAN, TERMASUK BULAN TANPA PELANGGARAN
+        $nama_bulan = [1 => 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+        $bulan_mulai = new DateTime($tanggal_mulai_grafik);
+        $bulan_mulai->modify('first day of this month');
+
+        $bulan_akhir = new DateTime($tanggal_selesai_grafik);
+        $bulan_akhir->modify('first day of this month');
+
+        while ($bulan_mulai <= $bulan_akhir) {
+            $periode_bulan = $bulan_mulai->format('Y-m');
+
+            $grafik_bulanan_labels[] = $nama_bulan[(int) $bulan_mulai->format('n')] . ' ' . $bulan_mulai->format('Y');
+            $grafik_bulanan_data[] = $data_bulanan_tersimpan[$periode_bulan] ?? 0;
+
+            $bulan_mulai->modify('+1 month');
+        }
+    }
+}
+
+// AMANKAN DATA PHP SEBELUM DIKIRIM KE JAVASCRIPT
+$opsi_json = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
+$json_bulanan_labels = json_encode($grafik_bulanan_labels, $opsi_json);
+$json_bulanan_data = json_encode($grafik_bulanan_data, $opsi_json);
 ?>
 
 <!DOCTYPE html>
@@ -294,10 +364,10 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - SIPES</title>
 
-    <!-- Bootstrap 5 CSS -->
+    <!-- BOOTSTRAP 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Font Awesome Icons -->
+    <!-- FONT AWESOME ICONS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
@@ -318,7 +388,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
 
         main {
             min-height: 100vh;
-            padding: 32px !important;
+            padding: 28px !important;
         }
 
         .dashboard-header {
@@ -326,7 +396,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
             justify-content: space-between;
             align-items: center;
             gap: 16px;
-            margin-bottom: 28px;
+            margin-bottom: 22px;
         }
 
         .dashboard-header h2 {
@@ -352,8 +422,8 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
         }
 
         .welcome-card {
-            padding: 27px;
-            margin-bottom: 28px;
+            padding: 24px;
+            margin-bottom: 22px;
             color: #ffffff;
             background: linear-gradient(120deg, #101c35, #203d5d);
             border-radius: 18px;
@@ -387,7 +457,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
         .section-title {
             font-size: 17px;
             font-weight: 750;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .stat-card {
@@ -406,12 +476,20 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
             box-shadow: 0 12px 28px rgba(16, 28, 53, 0.09);
         }
 
-        .stat-card-siswa { border-left: 5px solid #10b981 !important; }
-        .stat-card-guru { border-left: 5px solid #06b6d4 !important; }
-        .stat-card-kelas { border-left: 5px solid #8b5cf6 !important; }
+        .stat-card-siswa {
+            border-left: 5px solid #10b981 !important;
+        }
+
+        .stat-card-guru {
+            border-left: 5px solid #06b6d4 !important;
+        }
+
+        .stat-card-kelas {
+            border-left: 5px solid #8b5cf6 !important;
+        }
 
         .stat-card .card-body {
-            padding: 24px;
+            padding: 22px;
         }
 
         .stat-icon {
@@ -424,9 +502,20 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
             font-size: 20px;
         }
 
-        .icon-siswa { background-color: #e6f4ea; color: #10b981; }
-        .icon-guru { background-color: #e0f2fe; color: #06b6d4; }
-        .icon-kelas { background-color: #f3e8ff; color: #8b5cf6; }
+        .icon-siswa {
+            background-color: #e6f4ea;
+            color: #10b981;
+        }
+
+        .icon-guru {
+            background-color: #e0f2fe;
+            color: #06b6d4;
+        }
+
+        .icon-kelas {
+            background-color: #f3e8ff;
+            color: #8b5cf6;
+        }
 
         .stat-label {
             color: var(--muted);
@@ -464,10 +553,47 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
             background: #fff;
             border: 1px solid #e5eaf1;
             border-radius: 15px;
-            padding: 24px;
+            padding: 22px;
             box-shadow: 0 5px 20px rgba(16, 28, 53, 0.04);
         }
 
+        .analytics-card {
+            background: #ffffff;
+            border: 1px solid #e5eaf1;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(16, 28, 53, 0.04);
+            height: 100%;
+        }
+
+        .analytics-card h6 {
+            color: var(--navy);
+            font-size: 14px;
+            font-weight: 750;
+            margin-bottom: 4px;
+        }
+
+        .analytics-note {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+
+        /* UKURAN GRAFIK DESKTOP */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 240px;
+        }
+
+        .btn-toggle-section {
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* PENYESUAIAN TAMPILAN HP */
         @media (max-width: 767.98px) {
             main {
                 padding: 20px !important;
@@ -495,12 +621,24 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
             .stat-number {
                 font-size: 30px;
             }
+
+            /* UKURAN GRAFIK HP */
+            .chart-container {
+                height: 210px;
+            }
+
+            .content-card {
+                padding: 16px;
+            }
+
+            .analytics-card {
+                padding: 16px;
+            }
         }
     </style>
 </head>
 
 <body>
-
 <div class="container-fluid">
     <div class="row">
 
@@ -508,6 +646,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
 
         <main class="col-md-9 col-lg-10 p-4 ms-md-auto">
 
+            <!-- HEADER DASHBOARD -->
             <div class="dashboard-header">
                 <div>
                     <h2>Dashboard</h2>
@@ -524,6 +663,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                 </span>
             </div>
 
+            <!-- UCAPAN SELAMAT DATANG -->
             <section class="welcome-card">
                 <h3>Selamat datang, <?= $nama_pengguna ?>!</h3>
                 <p>
@@ -536,9 +676,10 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                 </p>
             </section>
 
+            <!-- RINGKASAN DATA -->
             <h5 class="section-title">Ringkasan Data</h5>
 
-            <div class="row mb-4">
+            <div class="row mb-3">
 
                 <!-- CARD DATA SISWA -->
                 <div class="<?= $role_pengguna == 'admin' ? 'col-md-4' : 'col-md-6' ?> mb-3">
@@ -548,6 +689,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                                 <span class="stat-label">
                                     <?= $wali_kelas_aktif ? 'Siswa Kelas Binaan' : 'Data Siswa' ?>
                                 </span>
+
                                 <div class="stat-icon icon-siswa">
                                     <i class="fas fa-user-graduate"></i>
                                 </div>
@@ -576,6 +718,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="stat-label">Data Guru</span>
+
                                     <div class="stat-icon icon-guru">
                                         <i class="fas fa-chalkboard-teacher"></i>
                                     </div>
@@ -588,6 +731,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                                         <i class="fas fa-user-check text-info me-1"></i>
                                         Pengajar aktif
                                     </small>
+
                                     <a href="data_guru.php" class="btn-teal">LIHAT DATA</a>
                                 </div>
                             </div>
@@ -603,6 +747,7 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                                 <span class="stat-label">
                                     <?= $wali_kelas_aktif ? 'Kelas Binaan' : 'Data Kelas' ?>
                                 </span>
+
                                 <div class="stat-icon icon-kelas">
                                     <i class="fas fa-door-open"></i>
                                 </div>
@@ -626,8 +771,69 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
 
             </div>
 
+            <!-- ANALITIK PELANGGARAN -->
+            <section class="mb-3">
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h5 class="section-title mb-1">Analitik Pelanggaran</h5>
+
+                        <small class="text-muted">
+                            Grafik berdasarkan tahun ajaran aktif:
+                            <?= htmlspecialchars($tahun_ajaran_label, ENT_QUOTES, 'UTF-8'); ?>
+                        </small>
+                    </div>
+
+                    <span class="badge rounded-pill text-bg-light border">
+                        <i class="fas fa-chart-line me-1 text-success"></i>
+                        Data aktual
+                    </span>
+                </div>
+
+                <?php if (!$ada_tahun_ajaran_aktif): ?>
+
+                    <div class="alert alert-warning rounded-3 mb-0">
+                        Tahun ajaran aktif belum tersedia atau tanggal mulai dan selesai belum diisi.
+                        Grafik analitik belum dapat ditampilkan.
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="row g-3">
+
+                        <!-- GRAFIK TREN PELANGGARAN BULANAN FULL WIDTH -->
+                        <div class="col-12">
+                            <div class="analytics-card">
+
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <div>
+                                        <h6>Tren Pelanggaran Bulanan</h6>
+                                        <p class="analytics-note mb-0">
+                                            Jumlah catatan pelanggaran setiap bulan selama tahun ajaran aktif.
+                                        </p>
+                                    </div>
+
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        <?= htmlspecialchars($tahun_ajaran_label, ENT_QUOTES, 'UTF-8'); ?>
+                                    </span>
+                                </div>
+
+                                <div class="chart-container">
+                                    <canvas id="grafikBulanan"></canvas>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </section>
+
             <!-- PERINGATAN SISWA DANGER -->
-            <div class="content-card mb-4">
+            <div class="content-card mb-3">
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
@@ -641,155 +847,204 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
                         </small>
                     </div>
 
-                    <span class="badge bg-danger fs-6">
-                        <?= $total_danger; ?> Siswa
-                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger fs-6">
+                            <?= $total_danger; ?> Siswa
+                        </span>
+
+                        <button
+                            class="btn btn-sm btn-outline-secondary btn-toggle-section"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#detailDanger"
+                            aria-expanded="false"
+                            aria-controls="detailDanger"
+                        >
+                            <i class="fas fa-chevron-down me-1"></i> Detail
+                        </button>
+                    </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                <div class="collapse" id="detailDanger">
 
-                        <thead class="table-light">
-                            <tr>
-                                <th>No</th>
-                                <th>NIS</th>
-                                <th>Nama Siswa</th>
-                                <th>Kelas</th>
-                                <th class="text-center">Jumlah Pelanggaran</th>
-                                <th class="text-center">Total Poin</th>
-                                <th class="text-center">Status</th>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
 
-                                <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
-                                    <th class="text-center">Surat</th>
-                                <?php endif; ?>
-                            </tr>
-                        </thead>
+                            <thead class="table-light">
+                                <tr>
+                                    <th>No</th>
+                                    <th>NIS</th>
+                                    <th>Nama Siswa</th>
+                                    <th>Kelas</th>
+                                    <th class="text-center">Jumlah Pelanggaran</th>
+                                    <th class="text-center">Total Poin</th>
+                                    <th class="text-center">Status</th>
 
-                        <tbody>
+                                    <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
+                                        <th class="text-center">Surat</th>
+                                    <?php endif; ?>
+                                </tr>
+                            </thead>
 
-                            <?php if (count($daftar_danger_tampil) > 0): ?>
+                            <tbody>
+                                <?php if (count($daftar_danger_tampil) > 0): ?>
 
-                                <?php $no_danger = 1; ?>
+                                    <?php $no_danger = 1; ?>
 
-                                <?php foreach ($daftar_danger_tampil as $danger): ?>
+                                    <?php foreach ($daftar_danger_tampil as $danger): ?>
+                                        <tr>
+                                            <td><?= $no_danger++; ?></td>
+
+                                            <td>
+                                                <?= htmlspecialchars($danger['nis'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+                                            </td>
+
+                                            <td>
+                                                <strong>
+                                                    <?= htmlspecialchars($danger['nama_siswa'], ENT_QUOTES, 'UTF-8'); ?>
+                                                </strong>
+                                            </td>
+
+                                            <td>
+                                                <?= htmlspecialchars($danger['nama_kelas'] ?? '-', ENT_QUOTES, 'UTF-8'); ?>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <?= $danger['jumlah_pelanggaran']; ?> Kasus
+                                            </td>
+
+                                            <td class="text-center">
+                                                <span class="badge bg-danger p-2">
+                                                    <?= $danger['total_poin']; ?> Poin
+                                                </span>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <span class="badge bg-danger">DANGER</span>
+                                            </td>
+
+                                            <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
+                                                <td class="text-center">
+                                                    <a href="surat_pemanggilan.php?id=<?= (int) $danger['id']; ?>" class="btn btn-sm btn-outline-primary rounded-3">
+                                                        <i class="fas fa-file-alt me-1"></i>
+                                                        Buat Surat
+                                                    </a>
+                                                </td>
+                                            <?php endif; ?>
+
+                                        </tr>
+                                    <?php endforeach; ?>
+
+                                <?php else: ?>
 
                                     <tr>
-                                        <td><?= $no_danger++; ?></td>
-
-                                        <td>
-                                            <?= htmlspecialchars($danger['nis'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
+                                        <td colspan="<?= ($role_pengguna == 'admin' || $wali_kelas_aktif) ? '8' : '7'; ?>" class="text-center text-muted py-4">
+                                            <i class="fas fa-check-circle text-success me-1"></i>
+                                            Belum ada siswa yang mencapai 50 poin.
                                         </td>
-
-                                        <td>
-                                            <strong>
-                                                <?= htmlspecialchars($danger['nama_siswa'], ENT_QUOTES, 'UTF-8'); ?>
-                                            </strong>
-                                        </td>
-
-                                        <td>
-                                            <?= htmlspecialchars($danger['nama_kelas'] ?? '-', ENT_QUOTES, 'UTF-8'); ?>
-                                        </td>
-
-                                        <td class="text-center">
-                                            <?= $danger['jumlah_pelanggaran']; ?> Kasus
-                                        </td>
-
-                                        <td class="text-center">
-                                            <span class="badge bg-danger p-2">
-                                                <?= $danger['total_poin']; ?> Poin
-                                            </span>
-                                        </td>
-
-                                        <td class="text-center">
-                                            <span class="badge bg-danger">
-                                                DANGER
-                                            </span>
-                                        </td>
-
-                                        <?php if ($role_pengguna == 'admin' || $wali_kelas_aktif): ?>
-                                            <td class="text-center">
-                                                <a
-                                                    href="surat_pemanggilan.php?id=<?= (int) $danger['id']; ?>"
-                                                    class="btn btn-sm btn-outline-primary rounded-3"
-                                                >
-                                                    <i class="fas fa-file-alt me-1"></i>
-                                                    Buat Surat
-                                                </a>
-                                            </td>
-                                        <?php endif; ?>
                                     </tr>
 
-                                <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
 
-                            <?php else: ?>
+                        </table>
+                    </div>
 
-                                <tr>
-                                    <td
-                                        colspan="<?= ($role_pengguna == 'admin' || $wali_kelas_aktif) ? '8' : '7'; ?>"
-                                        class="text-center text-muted py-4"
-                                    >
-                                        <i class="fas fa-check-circle text-success me-1"></i>
-                                        Belum ada siswa yang mencapai 50 poin.
-                                    </td>
-                                </tr>
+                    <?php if ($total_danger > 5): ?>
+                        <small class="text-muted d-block mt-2">
+                            Menampilkan 5 dari <?= $total_danger; ?> siswa Danger dengan poin tertinggi.
+                        </small>
+                    <?php endif; ?>
 
-                            <?php endif; ?>
-
-                        </tbody>
-
-                    </table>
                 </div>
-
-                <?php if ($total_danger > 5): ?>
-                    <small class="text-muted d-block mt-2">
-                        Menampilkan 5 dari <?= $total_danger; ?> siswa Danger dengan poin tertinggi.
-                    </small>
-                <?php endif; ?>
-
             </div>
 
             <!-- TABEL PELANGGARAN TERBARU -->
             <div class="content-card">
+
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="section-title m-0">Aktivitas / Pelanggaran Terbaru</h5>
-                    <a href="laporan.php" class="btn btn-sm btn-outline-secondary rounded-3">Lihat Semua</a>
+                    <h5 class="section-title m-0">
+                        Aktivitas / Pelanggaran Terbaru
+                    </h5>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="laporan.php" class="btn btn-sm btn-outline-secondary rounded-3">
+                            Lihat Semua
+                        </a>
+
+                        <button
+                            class="btn btn-sm btn-outline-secondary btn-toggle-section"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#detailAktivitas"
+                            aria-expanded="false"
+                            aria-controls="detailAktivitas"
+                        >
+                            <i class="fas fa-chevron-down me-1"></i> Detail
+                        </button>
+                    </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Tanggal</th>
-                                <th>Nama Siswa</th>
-                                <th>Kelas</th>
-                                <th>Pelanggaran</th>
-                                <th class="text-center">Poin</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($q_terbaru && mysqli_num_rows($q_terbaru) > 0): ?>
-                                <?php while ($row = mysqli_fetch_assoc($q_terbaru)): ?>
+                <div class="collapse" id="detailAktivitas">
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Nama Siswa</th>
+                                    <th>Kelas</th>
+                                    <th>Pelanggaran</th>
+                                    <th class="text-center">Poin</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <?php if ($q_terbaru && mysqli_num_rows($q_terbaru) > 0): ?>
+
+                                    <?php while ($row = mysqli_fetch_assoc($q_terbaru)): ?>
+                                        <tr>
+                                            <td>
+                                                <?= date('d/m/Y', strtotime($row['tanggal'])); ?>
+                                            </td>
+
+                                            <td>
+                                                <strong>
+                                                    <?= htmlspecialchars($row['nama_siswa']); ?>
+                                                </strong>
+                                            </td>
+
+                                            <td>
+                                                <?= htmlspecialchars($row['nama_kelas']); ?>
+                                            </td>
+
+                                            <td>
+                                                <?= htmlspecialchars($row['nama_pelanggaran']); ?>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <span class="badge bg-danger">
+                                                    <?= $row['poin']; ?> Poin
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <?php endwhile; ?>
+
+                                <?php else: ?>
+
                                     <tr>
-                                        <td><?= date('d/m/Y', strtotime($row['tanggal'])); ?></td>
-                                        <td><strong><?= htmlspecialchars($row['nama_siswa']); ?></strong></td>
-                                        <td><?= htmlspecialchars($row['nama_kelas']); ?></td>
-                                        <td><?= htmlspecialchars($row['nama_pelanggaran']); ?></td>
-                                        <td class="text-center">
-                                            <span class="badge bg-danger">
-                                                <?= $row['poin']; ?> Poin
-                                            </span>
+                                        <td colspan="5" class="text-center text-muted py-3">
+                                            Belum ada catatan pelanggaran terbaru.
                                         </td>
                                     </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-3">
-                                        Belum ada catatan pelanggaran terbaru.
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+
+                                <?php endif; ?>
+                            </tbody>
+
+                        </table>
+                    </div>
+
                 </div>
             </div>
 
@@ -797,6 +1052,63 @@ $daftar_danger_tampil = array_slice($daftar_danger, 0, 5);
     </div>
 </div>
 
+<!-- BOOTSTRAP JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- CHART.JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+<?php if ($ada_tahun_ajaran_aktif): ?>
+<script>
+    // GRAFIK TREN PELANGGARAN BULANAN
+    new Chart(document.getElementById('grafikBulanan'), {
+        type: 'line',
+
+        data: {
+            labels: <?= $json_bulanan_labels ?: '[]'; ?>,
+
+            datasets: [{
+                label: 'Jumlah Pelanggaran',
+                data: <?= $json_bulanan_data ?: '[]'; ?>,
+                borderColor: '#14b8a6',
+                backgroundColor: 'rgba(20, 184, 166, 0.12)',
+                pointBackgroundColor: '#14b8a6',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                borderWidth: 3,
+                tension: 0.35,
+                fill: true
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+
+                tooltip: {
+                    enabled: true
+                }
+            },
+
+            scales: {
+                y: {
+                    beginAtZero: true,
+
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+</script>
+<?php endif; ?>
+
 </body>
 </html>
