@@ -43,7 +43,7 @@ function nomorSudahDigunakan($koneksi, $kolom, $nomor, $id = 0)
 
     $duplikat = false;
 
-    // BANDINKAN ID AGAR SISWA YANG SEDANG DIEDIT TIDAK DIANGGAP DUPLIKAT
+    // BANDINGKAN ID AGAR SISWA YANG SEDANG DIEDIT TIDAK DIANGGAP DUPLIKAT
     while (mysqli_stmt_fetch($stmt)) {
         if ((int)$id_ditemukan !== (int)$id) {
             $duplikat = true;
